@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --delta-red: #C8102E;
+    --delta-red-hover: #A00D24;
+    --delta-dark: #111827;
+    --delta-dark-header: #1A1D20;
+    --delta-bg: #F9FAFB;
+  }
+}
+
+/* Custom Delta Branding Utilities */
+.bg-delta-red {
+  background-color: #C8102E;
+}
+.bg-delta-red-hover:hover {
+  background-color: #A00D24;
+}
+.text-delta-red {
+  color: #C8102E;
+}
+.border-delta-red {
+  border-color: #C8102E;
+}
+.bg-delta-dark {
+  background-color: #111827;
+}
