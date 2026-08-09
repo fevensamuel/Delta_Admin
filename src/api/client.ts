@@ -1,9 +1,8 @@
 import axios from 'axios';
 
 // Get the base URL from environment or use default
-const rawBaseUrl = ((import.meta as any).env?.VITE_API_URL as string) || 'http://localhost:3000/api';
-// Remove trailing /api if present to avoid double slashes
-const BASE_URL = rawBaseUrl.replace(/\/api\/?$/, '');
+// Don't remove /api - keep it as is
+const BASE_URL = ((import.meta as any).env?.VITE_API_URL as string) || 'http://localhost:3000/api';
 
 console.log('🔗 API Base URL:', BASE_URL);
 
