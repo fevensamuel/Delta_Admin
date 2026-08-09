@@ -3,7 +3,7 @@ import { SmsCampaign } from '../types';
 
 export async function getCampaignsApi(): Promise<SmsCampaign[]> {
   try {
-    const res = await apiClient.get('/api/admin/sms/campaigns');
+    const res = await apiClient.get('/admin/sms/campaigns');
     console.log('📡 SMS campaigns response:', res.data);
     
     // Handle different response structures
@@ -39,7 +39,7 @@ export async function sendSmsCampaignApi(campaignData: {
   message: string;
 }): Promise<SmsCampaign> {
   try {
-    const res = await apiClient.post('/api/admin/sms/campaign', campaignData);
+    const res = await apiClient.post('/admin/sms/campaign', campaignData);
     // Handle response structure
     const data = res.data?.data || res.data;
     return data;

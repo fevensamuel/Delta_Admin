@@ -15,7 +15,7 @@ const extractPackages = (data: any): Package[] => {
 
 export async function getPackagesApi(): Promise<Package[]> {
   try {
-    const res = await apiClient.get('/api/admin/packages');
+    const res = await apiClient.get('/admin/packages');
     const packages = extractPackages(res.data);
     console.log('✅ API Response - packages loaded:', packages.length);
     return packages;
@@ -27,7 +27,7 @@ export async function getPackagesApi(): Promise<Package[]> {
 
 export async function getPackageApi(id: string): Promise<Package | null> {
   try {
-    const res = await apiClient.get(`/api/admin/packages/${id}`);
+    const res = await apiClient.get(`/admin/packages/${id}`);
     const data = res.data;
     if (data && typeof data === 'object') {
       if (data.data) return data.data;
@@ -47,7 +47,7 @@ export async function createPackageApi(data: FormData): Promise<Package> {
   try {
     console.log('📤 createPackageApi - FormData');
     
-    const res = await apiClient.post('/api/admin/packages', data, {
+    const res = await apiClient.post('/admin/packages', data, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     const newPkg = res.data?.data || res.data;
@@ -66,7 +66,7 @@ export async function updatePackageApi(id: string, data: FormData): Promise<Pack
   try {
     console.log('📤 updatePackageApi - FormData:', { id });
     
-    const res = await apiClient.put(`/api/admin/packages/${id}`, data, {
+    const res = await apiClient.put(`/admin/packages/${id}`, data, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     const updatedPkg = res.data?.data || res.data;
@@ -83,7 +83,7 @@ export async function updatePackageApi(id: string, data: FormData): Promise<Pack
 // Delete package
 export async function deletePackageApi(id: string): Promise<void> {
   try {
-    await apiClient.delete(`/api/admin/packages/${id}`);
+    await apiClient.delete(`/admin/packages/${id}`);
     console.log('✅ Package deleted via API:', id);
   } catch (error) {
     console.error('❌ API Error - deleting from storage:', error);
@@ -95,7 +95,7 @@ export async function deletePackageApi(id: string): Promise<void> {
 
 export async function incrementPackageClicksApi(id: string): Promise<number> {
   try {
-    const res = await apiClient.post(`/api/packages/${id}/click-whatsapp`);
+    const res = await apiClient.post(`/packages/${id}/click-whatsapp`);
     const clicks = res.data?.whatsappClicks || res.data?.clicks || 0;
     console.log('✅ Click incremented via API:', clicks);
     return clicks;

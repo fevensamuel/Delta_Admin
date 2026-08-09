@@ -56,7 +56,7 @@ const extractGalleryItem = (data: any): GalleryItem | null => {
 
 export async function getGalleryItems(params: Record<string, any> = {}): Promise<GalleryItem[]> {
   try {
-    const res = await apiClient.get('/api/gallery', { params });
+    const res = await apiClient.get('/gallery', { params });
     console.log('📡 API Response for getGalleryItems:', res.data);
     const items = extractGalleryItems(res.data);
     console.log('✅ Gallery items loaded from API:', items.length);
@@ -69,7 +69,7 @@ export async function getGalleryItems(params: Record<string, any> = {}): Promise
 
 export async function getGalleryItem(id: string): Promise<GalleryItem> {
   try {
-    const res = await apiClient.get(`/api/gallery/${id}`);
+    const res = await apiClient.get(`/gallery/${id}`);
     const item = extractGalleryItem(res.data);
     if (!item) throw new Error('Gallery item not found');
     return item;
@@ -83,7 +83,7 @@ export async function createGalleryItem(data: FormData | Omit<GalleryItem, 'id' 
   try {
     const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
     const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
-    const res = await apiClient.post('/api/admin/gallery', data, config);
+    const res = await apiClient.post('/admin/gallery', data, config);
     const newItem = extractGalleryItem(res.data) || res.data;
     console.log('✅ Gallery item created via API:', newItem?.titleEn);
     return newItem;
@@ -98,7 +98,7 @@ export async function updateGalleryItem(id: string, data: FormData | Partial<Gal
   try {
     const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
     const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
-    const res = await apiClient.put(`/api/admin/gallery/${id}`, data, config);
+    const res = await apiClient.put(`/admin/gallery/${id}`, data, config);
     const updatedItem = extractGalleryItem(res.data) || res.data;
     console.log('✅ Gallery item updated via API:', updatedItem?.titleEn);
     return updatedItem;
@@ -110,7 +110,7 @@ export async function updateGalleryItem(id: string, data: FormData | Partial<Gal
 
 export async function deleteGalleryItem(id: string): Promise<void> {
   try {
-    await apiClient.delete(`/api/admin/gallery/${id}`);
+    await apiClient.delete(`/admin/gallery/${id}`);
     console.log('✅ Gallery item deleted via API:', id);
   } catch (error: any) {
     console.error('❌ Error deleting gallery item:', error);
@@ -148,7 +148,7 @@ export async function bulkUploadGallery(
     const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
     
     console.log('📤 Sending bulk upload payload:', payload);
-    const res = await apiClient.post('/api/admin/gallery/bulk', payload, config);
+    const res = await apiClient.post('/admin/gallery/bulk', payload, config);
     console.log('📡 Bulk upload response:', res.data);
     
     const items = extractGalleryItems(res.data);

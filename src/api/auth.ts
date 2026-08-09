@@ -18,7 +18,7 @@ export interface LoginResponse {
 export const loginApi = async (usernameOrEmail: string, password: string): Promise<LoginResponse> => {
   try {
     // Backend expects 'username' field - send the email as username
-    const response = await apiClient.post('/api/admin/auth/login', {
+    const response = await apiClient.post('/admin/auth/login', {
       username: usernameOrEmail,  // This can be email or username
       password: password
     });
@@ -33,7 +33,7 @@ export const loginApi = async (usernameOrEmail: string, password: string): Promi
 
 export const logoutApi = async (): Promise<void> => {
   try {
-    await apiClient.post('/api/admin/auth/logout');
+    await apiClient.post('/admin/auth/logout');
   } catch {
     // Silently handle logout errors
   }
@@ -41,7 +41,7 @@ export const logoutApi = async (): Promise<void> => {
 
 export const getCurrentUserApi = async () => {
   try {
-    const response = await apiClient.get('/api/admin/auth/me');
+    const response = await apiClient.get('/admin/auth/me');
     return response.data;
   } catch {
     return null;

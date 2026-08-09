@@ -3,7 +3,7 @@ import { User, UserRole } from '../types';
 
 export async function getUsersApi(): Promise<User[]> {
   try {
-    const res = await apiClient.get('/api/admin/users');
+    const res = await apiClient.get('/admin/users');
     const data = res.data?.data || res.data;
     return ensureArray<User>(data);
   } catch (error) {
@@ -24,7 +24,7 @@ export async function createUserApi(userData: {
       ...userData,
       password: userData.password ? '***' : '(missing)'
     });
-    const res = await apiClient.post('/api/admin/users', userData);
+    const res = await apiClient.post('/admin/users', userData);
     console.log('✅ User created successfully:', res.data);
     return res.data?.data || res.data;
   } catch (error: any) {
@@ -37,7 +37,7 @@ export async function createUserApi(userData: {
 
 export async function updateUserRoleApi(id: string, role: UserRole, status?: 'Active' | 'Inactive'): Promise<User> {
   try {
-    const res = await apiClient.put(`/api/admin/users/${id}/role`, { role, status });
+    const res = await apiClient.put(`/admin/users/${id}/role`, { role, status });
     return res.data?.data || res.data;
   } catch (error) {
     console.error('❌ Error updating user role:', error);
@@ -58,7 +58,7 @@ export async function updateUserApi(id: string, data: {
       ...data,
       password: data.password ? '***' : '(not changed)'
     });
-    const res = await apiClient.put(`/api/admin/users/${id}`, data);
+    const res = await apiClient.put(`/admin/users/${id}`, data);
     return res.data?.data || res.data;
   } catch (error) {
     console.error('❌ Error updating user:', error);
@@ -68,7 +68,7 @@ export async function updateUserApi(id: string, data: {
 
 export async function deleteUserApi(id: string): Promise<void> {
   try {
-    await apiClient.delete(`/api/admin/users/${id}`);
+    await apiClient.delete(`/admin/users/${id}`);
   } catch (error) {
     console.error('❌ Error deleting user:', error);
     throw error;
