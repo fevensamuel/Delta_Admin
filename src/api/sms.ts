@@ -8,21 +8,17 @@ export async function getCampaignsApi(): Promise<SmsCampaign[]> {
     
     // Handle different response structures
     if (res.data && typeof res.data === 'object') {
-      // If response has a data property that is an array
       if (Array.isArray(res.data.data)) {
         return res.data.data;
       }
-      // If response has a count property and data property
       if (res.data.count !== undefined && Array.isArray(res.data.data)) {
         return res.data.data;
       }
-      // If response is directly an array
       if (Array.isArray(res.data)) {
         return res.data;
       }
     }
     
-    // If we can't extract campaigns, return empty array
     console.warn('⚠️ Could not extract campaigns from response, returning empty array');
     return [];
   } catch (error) {
@@ -40,7 +36,6 @@ export async function sendSmsCampaignApi(campaignData: {
 }): Promise<SmsCampaign> {
   try {
     const res = await apiClient.post('/admin/sms/campaign', campaignData);
-    // Handle response structure
     const data = res.data?.data || res.data;
     return data;
   } catch (error) {
@@ -50,7 +45,6 @@ export async function sendSmsCampaignApi(campaignData: {
 }
 
 export async function sendTestSmsApi(phone: string, message: string): Promise<boolean> {
-  // Simulate test SMS sending
   await new Promise((resolve) => setTimeout(resolve, 800));
   if (!phone || phone.length < 8) {
     throw new Error('Invalid phone number provided for test SMS');

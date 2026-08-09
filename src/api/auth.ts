@@ -17,15 +17,13 @@ export interface LoginResponse {
 
 export const loginApi = async (usernameOrEmail: string, password: string): Promise<LoginResponse> => {
   try {
-    // Backend expects 'username' field - send the email as username
     const response = await apiClient.post('/admin/auth/login', {
-      username: usernameOrEmail,  // This can be email or username
+      username: usernameOrEmail,
       password: password
     });
     
     return response.data;
   } catch (error: any) {
-    // Extract error message from response
     const errorMessage = error?.response?.data?.error || error?.message || 'Login failed';
     throw new Error(errorMessage);
   }
