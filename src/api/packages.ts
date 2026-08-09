@@ -1,57 +1,92 @@
 import { apiClient, StorageService } from './client';
 import { Package } from '../types';
 
+// Helper to extract array from response
+const extractPackages = (data: any): Package[] => {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object') {
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data.packages)) return data.packages;
+    if (Array.isArray(data.results)) return data.results;
+    if (Array.isArray(data.items)) return data.items;
+  }
+  return [];
+};
+
 export async function getPackagesApi(): Promise<Package[]> {
   try {
-    const res = await apiClient.get('/api/packages');
-    return res.data;
-  } catch {
+    const res = await apiClient.get('/api/admin/packages');
+    const packages = extractPackages(res.data);
+    console.log('✅ API Response - packages loaded:', packages.length);
+    return packages;
+  } catch (error) {
+    console.error('❌ API Error - falling back to storage:', error);
     return StorageService.getPackages();
   }
 }
 
-export async function createPackageApi(pkgData: Omit<Package, 'id' | 'whatsappClicks' | 'createdAt' | 'updatedAt'>): Promise<Package> {
+export async function getPackageApi(id: string): Promise<Package | null> {
   try {
-    const res = await apiClient.post('/api/admin/packages', pkgData);
-    return res.data;
-  } catch {
+    const res = await apiClient.get(`/api/admin/packages/${id}`);
+    const data = res.data;
+    if (data && typeof data === 'object') {
+      if (data.data) return data.data;
+      return data;
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Error fetching package:', error);
     const packages = StorageService.getPackages();
-    const newPkg: Package = {
-      ...pkgData,
-      id: `pkg-${Date.now()}`,
-      whatsappClicks: 0,
-      createdAt: new Date().toISOString().substring(0, 10),
-      updatedAt: new Date().toISOString().substring(0, 10)
-    };
-    packages.unshift(newPkg);
-    StorageService.setPackages(packages);
-    return newPkg;
+    const pkg = packages.find((p) => p.id === id);
+    return pkg || null;
   }
 }
 
-export async function updatePackageApi(id: string, pkgData: Partial<Package>): Promise<Package> {
+// Create package with FormData (for file upload)
+export async function createPackageApi(data: FormData): Promise<Package> {
   try {
-    const res = await apiClient.put(`/api/admin/packages/${id}`, pkgData);
-    return res.data;
-  } catch {
-    const packages = StorageService.getPackages();
-    const idx = packages.findIndex((p) => p.id === id);
-    if (idx === -1) throw new Error('Package not found');
+    console.log('📤 createPackageApi - FormData');
     
-    packages[idx] = {
-      ...packages[idx],
-      ...pkgData,
-      updatedAt: new Date().toISOString().substring(0, 10)
-    };
-    StorageService.setPackages(packages);
-    return packages[idx];
+    const res = await apiClient.post('/api/admin/packages', data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    const newPkg = res.data?.data || res.data;
+    console.log('✅ Package created via API:', newPkg);
+    return newPkg;
+  } catch (error: any) {
+    console.error('❌ API Error - creating package:', error);
+    console.error('❌ Response data:', error.response?.data);
+    console.error('❌ Response status:', error.response?.status);
+    throw error;
   }
 }
 
+// Update package with FormData (for file upload)
+export async function updatePackageApi(id: string, data: FormData): Promise<Package> {
+  try {
+    console.log('📤 updatePackageApi - FormData:', { id });
+    
+    const res = await apiClient.put(`/api/admin/packages/${id}`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    const updatedPkg = res.data?.data || res.data;
+    console.log('✅ Package updated via API:', updatedPkg);
+    return updatedPkg;
+  } catch (error: any) {
+    console.error('❌ API Error - updating package:', error);
+    console.error('❌ Response data:', error.response?.data);
+    console.error('❌ Response status:', error.response?.status);
+    throw error;
+  }
+}
+
+// Delete package
 export async function deletePackageApi(id: string): Promise<void> {
   try {
     await apiClient.delete(`/api/admin/packages/${id}`);
-  } catch {
+    console.log('✅ Package deleted via API:', id);
+  } catch (error) {
+    console.error('❌ API Error - deleting from storage:', error);
     const packages = StorageService.getPackages();
     const filtered = packages.filter((p) => p.id !== id);
     StorageService.setPackages(filtered);
@@ -61,8 +96,11 @@ export async function deletePackageApi(id: string): Promise<void> {
 export async function incrementPackageClicksApi(id: string): Promise<number> {
   try {
     const res = await apiClient.post(`/api/packages/${id}/click-whatsapp`);
-    return res.data?.whatsappClicks || res.data?.clicks || 1;
-  } catch {
+    const clicks = res.data?.whatsappClicks || res.data?.clicks || 0;
+    console.log('✅ Click incremented via API:', clicks);
+    return clicks;
+  } catch (error) {
+    console.error('❌ API Error - incrementing in storage:', error);
     const packages = StorageService.getPackages();
     const pkg = packages.find((p) => p.id === id);
     if (pkg) {

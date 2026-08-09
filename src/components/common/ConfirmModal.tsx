@@ -11,6 +11,7 @@ interface ConfirmModalProps {
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
+  children?: React.ReactNode;
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -22,7 +23,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   variant = 'danger',
   onConfirm,
   onCancel,
-  isLoading = false
+  isLoading = false,
+  children
 }) => {
   if (!isOpen) return null;
 
@@ -53,6 +55,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <div className="mt-4">
             <h3 className="text-lg font-bold text-slate-900">{title}</h3>
             <p className="mt-2 text-sm text-slate-600 leading-relaxed">{message}</p>
+            {children}
           </div>
 
           <div className="mt-6 flex items-center justify-end gap-3">

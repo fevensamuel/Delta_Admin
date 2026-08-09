@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Subscriber } from '../../types';
+import { useNavigate } from 'react-router-dom';
+import { Subscriber, Package } from '../../types';
 import {
   getSubscribersApi,
   updateSubscriberStatusApi,
@@ -7,12 +8,14 @@ import {
   bulkDeleteSubscribersApi,
   bulkImportSubscribersApi
 } from '../../api/subscribers';
+import { getPackagesApi } from '../../api/packages';
 import { BulkImportModal } from '../../components/modals/BulkImportModal';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { RoleGuard } from '../../components/common/RoleGuard';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { ensureArray } from '../../api/client';
 import {
   Users,
   Search,
@@ -23,21 +26,24 @@ import {
   PhoneCall,
   Mail,
   UserX,
-  CheckCircle,
-  XCircle
+  Send,
+  Package as PackageIcon
 } from 'lucide-react';
 
 export const SubscriberManager: React.FC = () => {
+  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
 
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [channelFilter, setChannelFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [packageFilter, setPackageFilter] = useState('All');
 
   // Multi-select for bulk action
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -61,10 +67,13 @@ export const SubscriberManager: React.FC = () => {
   const loadSubscribers = async () => {
     setIsLoading(true);
     try {
-      const data = await getSubscribersApi();
-      setSubscribers(data);
+      const [sData, pData] = await Promise.all([getSubscribersApi(), getPackagesApi()]);
+      setSubscribers(ensureArray<Subscriber>(sData));
+      setPackages(ensureArray<Package>(pData));
     } catch {
       showToast('error', 'Failed to load subscribers');
+      setSubscribers([]);
+      setPackages([]);
     } finally {
       setIsLoading(false);
     }
@@ -112,19 +121,21 @@ export const SubscriberManager: React.FC = () => {
   };
 
   const handleExportCsv = () => {
-    if (subscribers.length === 0) {
+    const subscribersArray = ensureArray<Subscriber>(subscribers);
+    if (subscribersArray.length === 0) {
       showToast('info', 'No subscribers to export');
       return;
     }
 
+    const filteredSubs = getFilteredSubscribers();
     const headers = ['Phone', 'Email', 'Channel', 'Package Interest', 'Status', 'Date Subscribed'];
-    const rows = filteredSubscribers.map((s) => [
+    const rows = filteredSubs.map((s) => [
       s.phone,
       s.email || '',
-      s.channel,
+      s.channel || '',
       `"${s.packageInterest || ''}"`,
-      s.optInStatus,
-      s.dateSubscribed
+      s.optInStatus || 'Active',
+      s.dateSubscribed || new Date().toISOString().split('T')[0]
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -139,6 +150,31 @@ export const SubscriberManager: React.FC = () => {
     showToast('success', 'Exported subscribers CSV report');
   };
 
+  const getFilteredSubscribers = () => {
+    const subscribersArray = ensureArray<Subscriber>(subscribers);
+    return subscribersArray.filter((sub) => {
+      const matchesSearch =
+        sub.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (sub.email && sub.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (sub.packageInterest && sub.packageInterest.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesChannel = channelFilter === 'All' || sub.channel === channelFilter;
+      const matchesStatus = statusFilter === 'All' || sub.optInStatus === statusFilter;
+
+      const matchesPackage =
+        packageFilter === 'All' ||
+        (sub.packageInterest &&
+          (sub.packageInterest.toLowerCase().includes(packageFilter.toLowerCase()) ||
+            packageFilter.toLowerCase().includes(sub.packageInterest.toLowerCase())));
+
+      return matchesSearch && matchesChannel && matchesStatus && matchesPackage;
+    });
+  };
+
+  const filteredSubscribers = getFilteredSubscribers();
+  const totalPages = Math.ceil(filteredSubscribers.length / pageSize) || 1;
+  const paginatedSubscribers = filteredSubscribers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
       setSelectedIds(paginatedSubscribers.map((s) => s.id));
@@ -150,18 +186,6 @@ export const SubscriberManager: React.FC = () => {
   const handleToggleSelectOne = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
-
-  const filteredSubscribers = subscribers.filter((sub) => {
-    const matchesSearch =
-      sub.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (sub.email && sub.email.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesChannel = channelFilter === 'All' || sub.channel === channelFilter;
-    const matchesStatus = statusFilter === 'All' || sub.optInStatus === statusFilter;
-    return matchesSearch && matchesChannel && matchesStatus;
-  });
-
-  const totalPages = Math.ceil(filteredSubscribers.length / pageSize) || 1;
-  const paginatedSubscribers = filteredSubscribers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   if (isLoading) {
     return <LoadingSpinner text="Loading Subscriber Database..." />;
@@ -210,8 +234,21 @@ export const SubscriberManager: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Filter className="w-4 h-4 text-slate-500" />
+              <select
+                value={packageFilter}
+                onChange={(e) => setPackageFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-[#1A5B4B] bg-white"
+              >
+                <option value="All">All Packages</option>
+                {packages.map((pkg) => (
+                  <option key={pkg.id} value={pkg.titleEn}>
+                    📦 {pkg.titleEn}
+                  </option>
+                ))}
+              </select>
+
               <select
                 value={channelFilter}
                 onChange={(e) => setChannelFilter(e.target.value)}
@@ -293,7 +330,7 @@ export const SubscriberManager: React.FC = () => {
                       </td>
 
                       <td className="p-3.5 font-bold font-mono text-slate-900 text-sm">
-                        {sub.phone}
+                        {sub.phone || 'N/A'}
                       </td>
 
                       <td className="p-3.5 text-slate-600">
@@ -302,7 +339,7 @@ export const SubscriberManager: React.FC = () => {
 
                       <td className="p-3.5">
                         <span className="px-2 py-0.5 rounded bg-slate-100 font-semibold text-slate-700 text-[11px]">
-                          {sub.channel}
+                          {sub.channel || 'Unknown'}
                         </span>
                       </td>
 
@@ -318,16 +355,30 @@ export const SubscriberManager: React.FC = () => {
                               : 'bg-rose-100 text-rose-800'
                           }`}
                         >
-                          {sub.optInStatus}
+                          {sub.optInStatus || 'Active'}
                         </span>
                       </td>
 
                       <td className="p-3.5 text-slate-500">
-                        {sub.dateSubscribed}
+                        {sub.dateSubscribed || new Date().toISOString().split('T')[0]}
                       </td>
 
                       <td className="p-3.5 pr-5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {sub.packageInterest && (
+                            <button
+                              onClick={() =>
+                                navigate('/sms', {
+                                  state: { targetFilter: `Package: ${sub.packageInterest}` }
+                                })
+                              }
+                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-[#1A5B4B]/10 text-[#1A5B4B] transition-colors"
+                              title={`Compose SMS for ${sub.packageInterest} Subscribers`}
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
                           <button
                             onClick={() => handleToggleOptStatus(sub)}
                             className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"

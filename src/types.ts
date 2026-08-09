@@ -47,13 +47,14 @@ export interface Package {
   updatedAt: string;
 }
 
-export type GalleryType = 'Photo' | 'Video';
+export type GalleryType = 'photo' | 'video' | 'Photo' | 'Video';
 
 export interface GalleryItem {
   id: string;
   type: GalleryType;
   titleEn: string;
   titleAr?: string;
+  titleAm?: string;  // Added for Amharic titles
   imageUrl: string;
   videoUrl?: string;
   duration?: string;
@@ -61,17 +62,23 @@ export interface GalleryItem {
   description?: string;
   isActive: boolean;
   sortOrder?: number;
-  uploadDate: string;
+  uploadDate: string;  // Frontend uses this
+  createdAt?: string;  // Backend returns this
+  updatedAt?: string;  // Backend returns this
 }
 
 export interface Subscriber {
   id: string;
   phone: string;
   email?: string;
-  channel: 'WhatsApp' | 'Web Banner' | 'Footer' | 'Direct';
-  packageInterest?: string;
+  name?: string;  // Added
+  channel: string;  // Changed from strict union to string for flexibility
+  packageInterestId?: string;  // Changed from packageInterest
+  packageInterest?: string;  // Kept for backward compatibility
   optInStatus: 'Active' | 'Opt-out';
   dateSubscribed: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SmsCampaign {
@@ -98,6 +105,8 @@ export interface Inquiry {
   dateReceived: string;
   adminNotes?: string;
   readAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PackageClickStat {

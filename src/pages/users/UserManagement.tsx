@@ -8,8 +8,10 @@ import { RoleGuard } from '../../components/common/RoleGuard';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { UserPlus, Search, ShieldCheck, Lock, Edit, Trash2, KeyRound } from 'lucide-react';
+import { ensureArray } from '../../api/client';
 
 export const UserManagement: React.FC = () => {
+  const { user: currentUser, hasPermission } = useAuth();
   const { showToast } = useToast();
 
   const [users, setUsers] = useState<User[]>([]);
@@ -26,6 +28,9 @@ export const UserManagement: React.FC = () => {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Check if current user is SuperAdmin
+  const isSuperAdmin = currentUser?.role === 'SuperAdmin';
+
   useEffect(() => {
     loadUsers();
   }, []);
@@ -34,34 +39,57 @@ export const UserManagement: React.FC = () => {
     setIsLoading(true);
     try {
       const data = await getUsersApi();
-      setUsers(data);
-    } catch {
+      setUsers(ensureArray<User>(data));
+      console.log('✅ Users loaded:', data?.length || 0);
+    } catch (error) {
+      console.error('❌ Error loading users:', error);
       showToast('error', 'Failed to load user list');
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSaveUser = async (data: { username: string; email: string; password?: string; role: UserRole; status: 'Active' | 'Inactive' }) => {
+  // FIXED: Properly handle the form data
+  const handleSaveUser = async (formData: { 
+    username: string; 
+    email: string; 
+    password?: string; 
+    role: UserRole; 
+    status: 'Active' | 'Inactive' 
+  }) => {
     setIsSaving(true);
     try {
+      // Make sure password is included for new users
+      if (!userToEdit && !formData.password) {
+        showToast('error', 'Password is required for new users');
+        return;
+      }
+
+      const userData = {
+        username: formData.username.trim(),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password || '', // Send empty string if no password (for edit)
+        role: formData.role,
+        status: formData.status
+      };
+
+      console.log('📤 Sending user data:', { ...userData, password: userData.password ? '***' : '' });
+
       if (userToEdit) {
-        await updateUserApi(userToEdit.id, data);
-        showToast('success', `User "${data.username}" credentials updated`);
+        await updateUserApi(userToEdit.id, userData);
+        showToast('success', `User "${formData.username}" updated successfully`);
       } else {
-        await createUserApi({
-          username: data.username,
-          email: data.email,
-          role: data.role,
-          status: data.status
-        });
-        showToast('success', `New user "${data.username}" created!`);
+        await createUserApi(userData);
+        showToast('success', `New user "${formData.username}" created successfully`);
       }
       setIsFormOpen(false);
       setUserToEdit(null);
       loadUsers();
-    } catch {
-      showToast('error', 'Failed to save user account');
+    } catch (error: any) {
+      console.error('❌ Error saving user:', error);
+      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to save user account';
+      showToast('error', errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -75,16 +103,19 @@ export const UserManagement: React.FC = () => {
       showToast('success', 'User account removed');
       setUserToDelete(null);
       loadUsers();
-    } catch {
+    } catch (error) {
+      console.error('❌ Error deleting user:', error);
       showToast('error', 'Failed to delete user');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch = u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          u.email.toLowerCase().includes(searchTerm.toLowerCase());
+  const usersArray = ensureArray<User>(users);
+
+  const filteredUsers = usersArray.filter((u) => {
+    const matchesSearch = u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          u.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'All' || u.role === roleFilter;
     return matchesSearch && matchesRole;
   });
@@ -103,15 +134,17 @@ export const UserManagement: React.FC = () => {
             <p className="text-xs text-slate-500 mt-0.5">Manage staff login accounts, access roles (SuperAdmin, Admin, Editor) and permissions.</p>
           </div>
 
-          <button
-            onClick={() => {
-              setUserToEdit(null);
-              setIsFormOpen(true);
-            }}
-            className="px-5 py-2.5 rounded-xl bg-[#1A5B4B] hover:bg-[#14483B] text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 self-start sm:self-auto"
-          >
-            <UserPlus className="w-4 h-4 text-[#C9A84C]" /> Create New Admin User
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => {
+                setUserToEdit(null);
+                setIsFormOpen(true);
+              }}
+              className="px-5 py-2.5 rounded-xl bg-[#1A5B4B] hover:bg-[#14483B] text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 self-start sm:self-auto"
+            >
+              <UserPlus className="w-4 h-4 text-[#C9A84C]" /> Create New Admin User
+            </button>
+          )}
         </div>
 
         {/* Toolbar */}
@@ -138,14 +171,14 @@ export const UserManagement: React.FC = () => {
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                {r}
+                {r === 'All' ? 'All Roles' : r}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Modal */}
-        {isFormOpen && (
+        {/* User Form Modal */}
+        {isFormOpen && isSuperAdmin && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
             <div className="w-full max-w-lg">
               <UserForm
@@ -178,7 +211,7 @@ export const UserManagement: React.FC = () => {
                 {filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-8 text-center text-slate-500">
-                      No admin user accounts found.
+                      {usersArray.length === 0 ? 'No admin user accounts found.' : 'No users match your search criteria.'}
                     </td>
                   </tr>
                 ) : (
@@ -187,7 +220,7 @@ export const UserManagement: React.FC = () => {
                       <td className="p-3.5 pl-5">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-slate-100 text-[#1A5B4B] font-bold flex items-center justify-center border border-slate-200 uppercase">
-                            {usr.username.substring(0, 2)}
+                            {usr.username?.substring(0, 2) || '??'}
                           </div>
                           <div>
                             <p className="font-bold text-slate-900 text-sm">{usr.username}</p>
@@ -216,7 +249,7 @@ export const UserManagement: React.FC = () => {
                             usr.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                           }`}
                         >
-                          {usr.status}
+                          {usr.status || 'Active'}
                         </span>
                       </td>
 
@@ -226,24 +259,30 @@ export const UserManagement: React.FC = () => {
 
                       <td className="p-3.5 pr-5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => {
-                              setUserToEdit(usr);
-                              setIsFormOpen(true);
-                            }}
-                            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
-                            title="Edit Credentials or Role"
-                          >
-                            <Edit className="w-4 h-4 text-[#1A5B4B]" />
-                          </button>
+                          {isSuperAdmin ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setUserToEdit(usr);
+                                  setIsFormOpen(true);
+                                }}
+                                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
+                                title="Edit Credentials or Role"
+                              >
+                                <Edit className="w-4 h-4 text-[#1A5B4B]" />
+                              </button>
 
-                          <button
-                            onClick={() => setUserToDelete(usr)}
-                            className="p-1.5 rounded-lg border border-slate-200 hover:bg-rose-50 text-rose-600 transition-colors"
-                            title="Delete Account"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                              <button
+                                onClick={() => setUserToDelete(usr)}
+                                className="p-1.5 rounded-lg border border-slate-200 hover:bg-rose-50 text-rose-600 transition-colors"
+                                title="Delete Account"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">View only</span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -258,7 +297,7 @@ export const UserManagement: React.FC = () => {
         <ConfirmModal
           isOpen={!!userToDelete}
           title="Delete Admin Account?"
-          message={`Are you sure you want to revoke and delete admin account "${userToDelete?.username}"?`}
+          message={`Are you sure you want to revoke and delete admin account "${userToDelete?.username}"? This action cannot be undone.`}
           confirmLabel="Delete User Account"
           onConfirm={handleDeleteConfirm}
           onCancel={() => setUserToDelete(null)}

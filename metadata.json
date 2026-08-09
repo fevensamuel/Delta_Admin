@@ -2,5 +2,5 @@
   "name": "Delta Travel Admin",
   "description": "Admin Dashboard UI for Delta Travel & Tour - Managing packages, gallery, visa info, partners, subscribers, inquiries, SMS campaigns, and users.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

@@ -24,19 +24,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Restore auth state from localStorage on load
-    const savedToken = localStorage.getItem('token') || localStorage.getItem('admin_token');
-    const savedUser = localStorage.getItem('user') || localStorage.getItem('admin_user');
+    const savedToken = localStorage.getItem('admin_token') || localStorage.getItem('token');
+    const savedUser = localStorage.getItem('admin_user') || localStorage.getItem('user');
 
     if (savedToken && savedUser) {
       try {
+        const parsedUser = JSON.parse(savedUser);
         setToken(savedToken);
-        setUser(JSON.parse(savedUser));
-      } catch {
+        setUser(parsedUser);
+        console.log('✅ Auth restored:', parsedUser.username);
+      } catch (error) {
+        console.error('❌ Error restoring auth:', error);
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('role');
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_user');
       }
     }
     setIsLoading(false);
@@ -44,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (usernameOrEmail: string, password: string) => {
     try {
+      console.log('📤 Attempting login for:', usernameOrEmail);
       const res = await loginApi(usernameOrEmail, password);
       
       // Check isActive status
@@ -53,14 +57,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setToken(res.token);
       setUser(res.user);
+      
+      // Save to localStorage
+      localStorage.setItem('admin_token', res.token);
+      localStorage.setItem('admin_user', JSON.stringify(res.user));
       localStorage.setItem('token', res.token);
       localStorage.setItem('user', JSON.stringify(res.user));
       localStorage.setItem('role', res.user.role);
-      localStorage.setItem('admin_token', res.token);
-      localStorage.setItem('admin_user', JSON.stringify(res.user));
-      showToast('success', `Welcome back, ${res.user.username} (${res.user.role})!`);
+      
+      console.log('✅ Login successful:', res.user.username);
+      showToast('success', `Welcome back, ${res.user.username}!`);
     } catch (err: any) {
-      showToast('error', err.message || 'Login failed');
+      console.error('❌ Login error:', err.message);
+      showToast('error', err.message || 'Login failed. Please check your credentials.');
       throw err;
     }
   };
@@ -68,11 +77,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = (message?: string) => {
     setToken(null);
     setUser(null);
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('role');
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_user');
     showToast('info', message || 'Logged out successfully');
   };
 
@@ -84,24 +93,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast('info', `Switched active role to ${newRole} for demonstration`);
   };
 
+  // ============================================================
+  // PERMISSION SYSTEM - SuperAdmin has FULL access to everything
+  // ============================================================
   const hasPermission = (module: string, action: 'view' | 'create' | 'edit' | 'delete' | 'send' | 'import' = 'view'): boolean => {
     if (!user) return false;
     const role = user.role;
 
-    // SuperAdmin has full access to everything
+    // ============================================================
+    // SUPERADMIN - FULL ACCESS TO EVERYTHING
+    // ============================================================
     if (role === 'SuperAdmin') return true;
 
-    // User Management is SuperAdmin ONLY
+    // ============================================================
+    // USER MANAGEMENT - ONLY SUPERADMIN
+    // ============================================================
     if (module === 'users') {
       return false;
     }
 
-    // Admin role permissions
+    // ============================================================
+    // ADMIN PERMISSIONS
+    // ============================================================
     if (role === 'Admin') {
+      // Admins have access to everything except user management
       return true;
     }
 
-    // Editor role permissions
+    // ============================================================
+    // EDITOR PERMISSIONS
+    // ============================================================
     if (role === 'Editor') {
       switch (module) {
         case 'dashboard':

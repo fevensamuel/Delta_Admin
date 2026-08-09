@@ -55,14 +55,8 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
       });
 
       if (rows.length === 0) {
-        // Generate mock parsed sample if empty or custom format
-        const mockParsed = [
-          { phone: '+251911887766', email: 'ethio.pilgrim1@gmail.com', channel: 'WhatsApp', interest: '14 Days Ramadan Package' },
-          { phone: '+251922776655', email: 'habesha.traveler@yahoo.com', channel: 'Web Banner', interest: 'Economy Umrah' },
-          { phone: '+251933665544', email: 'addis.sub@hotmail.com', channel: 'Footer', interest: 'Hajj 2027 VIP' }
-        ];
-        setParsedRows(mockParsed);
-        showToast('info', 'Sample CSV structure loaded');
+        setParsedRows([]);
+        showToast('error', 'No valid subscribers found in the uploaded CSV file');
       } else {
         setParsedRows(rows);
         showToast('success', `Parsed ${rows.length} subscribers from CSV`);

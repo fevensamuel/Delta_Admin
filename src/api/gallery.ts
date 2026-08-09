@@ -1,154 +1,172 @@
-import { apiClient, StorageService } from './client';
+import { apiClient } from './client';
 import { GalleryItem } from '../types';
+
+// Helper to extract array from response
+const extractGalleryItems = (data: any): GalleryItem[] => {
+  console.log('🔍 Extracting gallery items from:', data);
+  
+  if (!data) {
+    console.warn('⚠️ No data received from API');
+    return [];
+  }
+  
+  if (Array.isArray(data)) {
+    console.log('✅ Data is already an array:', data.length);
+    return data;
+  }
+  
+  if (data && typeof data === 'object') {
+    if (Array.isArray(data.data)) {
+      console.log('✅ Found data.data array:', data.data.length);
+      return data.data;
+    }
+    if (Array.isArray(data.items)) {
+      console.log('✅ Found data.items array:', data.items.length);
+      return data.items;
+    }
+    if (Array.isArray(data.results)) {
+      console.log('✅ Found data.results array:', data.results.length);
+      return data.results;
+    }
+    if (Array.isArray(data.gallery)) {
+      console.log('✅ Found data.gallery array:', data.gallery.length);
+      return data.gallery;
+    }
+    if (Array.isArray(data.rows)) {
+      console.log('✅ Found data.rows array:', data.rows.length);
+      return data.rows;
+    }
+    if (data.id) {
+      console.log('✅ Single item found, wrapping in array');
+      return [data];
+    }
+  }
+  
+  console.warn('⚠️ Could not extract array from response, returning empty array');
+  return [];
+};
+
+// Helper to extract single item from response
+const extractGalleryItem = (data: any): GalleryItem | null => {
+  if (!data) return null;
+  if (data.data) return data.data;
+  if (data.id) return data;
+  return null;
+};
 
 export async function getGalleryItems(params: Record<string, any> = {}): Promise<GalleryItem[]> {
   try {
     const res = await apiClient.get('/api/gallery', { params });
-    return res.data?.data || res.data;
-  } catch {
-    let items = StorageService.getGallery();
-    if (params.type && params.type !== 'all' && params.type !== 'All') {
-      const typeLower = params.type.toLowerCase();
-      items = items.filter((g) => g.type.toLowerCase() === typeLower);
-    }
+    console.log('📡 API Response for getGalleryItems:', res.data);
+    const items = extractGalleryItems(res.data);
+    console.log('✅ Gallery items loaded from API:', items.length);
     return items;
+  } catch (error) {
+    console.error('❌ API Error loading gallery items:', error);
+    throw error;
   }
 }
 
 export async function getGalleryItem(id: string): Promise<GalleryItem> {
   try {
     const res = await apiClient.get(`/api/gallery/${id}`);
-    return res.data?.data || res.data;
-  } catch {
-    const items = StorageService.getGallery();
-    const found = items.find((g) => g.id === id);
-    if (!found) throw new Error('Gallery item not found');
-    return found;
+    const item = extractGalleryItem(res.data);
+    if (!item) throw new Error('Gallery item not found');
+    return item;
+  } catch (error) {
+    throw new Error((error as Error)?.message || 'Gallery item not found');
   }
 }
 
+// FIX: Accept both FormData and JSON payload
 export async function createGalleryItem(data: FormData | Omit<GalleryItem, 'id' | 'uploadDate'>): Promise<GalleryItem> {
   try {
     const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
     const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
     const res = await apiClient.post('/api/admin/gallery', data, config);
-    return res.data?.data || res.data;
-  } catch {
-    const items = StorageService.getGallery();
-    let newItem: GalleryItem;
-
-    if (typeof FormData !== 'undefined' && data instanceof FormData) {
-      const titleEn = (data.get('titleEn') as string) || 'New Item';
-      const titleAr = (data.get('titleAr') as string) || undefined;
-      const typeStr = (data.get('type') as string) || 'Photo';
-      const type = (typeStr.toLowerCase() === 'video' ? 'Video' : 'Photo') as 'Photo' | 'Video';
-      const location = (data.get('location') as string) || undefined;
-      const description = (data.get('description') as string) || undefined;
-      const isActive = data.get('isActive') !== 'false';
-      const sortOrder = Number(data.get('sortOrder')) || 1;
-      const duration = (data.get('duration') as string) || undefined;
-
-      newItem = {
-        id: `gal-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        type,
-        titleEn,
-        titleAr,
-        imageUrl: 'https://images.unsplash.com/photo-1591604466107-ec97de577aff?auto=format&fit=crop&q=80&w=800',
-        duration,
-        location,
-        description,
-        isActive,
-        sortOrder,
-        uploadDate: new Date().toISOString().substring(0, 10),
-      };
-    } else {
-      newItem = {
-        ...(data as Omit<GalleryItem, 'id' | 'uploadDate'>),
-        id: `gal-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        uploadDate: new Date().toISOString().substring(0, 10),
-      };
-    }
-
-    items.unshift(newItem);
-    StorageService.setGallery(items);
+    const newItem = extractGalleryItem(res.data) || res.data;
+    console.log('✅ Gallery item created via API:', newItem?.titleEn);
     return newItem;
+  } catch (error: any) {
+    console.error('❌ Error creating gallery item:', error);
+    throw new Error(error?.response?.data?.error || 'Failed to create gallery item');
   }
 }
 
+// FIX: Accept both FormData and JSON payload
 export async function updateGalleryItem(id: string, data: FormData | Partial<GalleryItem>): Promise<GalleryItem> {
   try {
     const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
     const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
     const res = await apiClient.put(`/api/admin/gallery/${id}`, data, config);
-    return res.data?.data || res.data;
-  } catch {
-    const items = StorageService.getGallery();
-    const idx = items.findIndex((g) => g.id === id);
-    if (idx === -1) throw new Error('Gallery item not found');
-
-    if (typeof FormData !== 'undefined' && data instanceof FormData) {
-      const titleEn = data.get('titleEn') as string;
-      if (titleEn) items[idx].titleEn = titleEn;
-      const titleAr = data.get('titleAr') as string;
-      if (titleAr !== null) items[idx].titleAr = titleAr;
-      const location = data.get('location') as string;
-      if (location !== null) items[idx].location = location;
-      const description = data.get('description') as string;
-      if (description !== null) items[idx].description = description;
-      if (data.has('isActive')) items[idx].isActive = data.get('isActive') === 'true';
-      if (data.has('sortOrder')) items[idx].sortOrder = Number(data.get('sortOrder'));
-      if (data.has('duration')) items[idx].duration = data.get('duration') as string;
-    } else {
-      items[idx] = { ...items[idx], ...(data as Partial<GalleryItem>) };
-    }
-
-    StorageService.setGallery(items);
-    return items[idx];
+    const updatedItem = extractGalleryItem(res.data) || res.data;
+    console.log('✅ Gallery item updated via API:', updatedItem?.titleEn);
+    return updatedItem;
+  } catch (error: any) {
+    console.error('❌ Error updating gallery item:', error);
+    throw new Error(error?.response?.data?.error || 'Failed to update gallery item');
   }
 }
 
 export async function deleteGalleryItem(id: string): Promise<void> {
   try {
     await apiClient.delete(`/api/admin/gallery/${id}`);
-  } catch {
-    const items = StorageService.getGallery();
-    const filtered = items.filter((g) => g.id !== id);
-    StorageService.setGallery(filtered);
+    console.log('✅ Gallery item deleted via API:', id);
+  } catch (error: any) {
+    console.error('❌ Error deleting gallery item:', error);
+    throw new Error(error?.response?.data?.error || 'Failed to delete gallery item');
   }
 }
 
+// FIX: Bulk upload with FormData support
 export async function bulkUploadGallery(
-  files: (FormData | Omit<GalleryItem, 'id' | 'uploadDate'> | {
+  files: FormData | {
     titleEn: string;
-    imageUrl: string;
+    imageUrl?: string;
+    videoUrl?: string;
     titleAr?: string;
+    titleAm?: string;
     location?: string;
     description?: string;
     type?: 'Photo' | 'Video';
     isActive?: boolean;
     sortOrder?: number;
-  })[]
+    duration?: string;
+  }[]
 ): Promise<GalleryItem[]> {
   try {
-    const res = await apiClient.post('/api/admin/gallery/bulk', { files });
-    return res.data?.data || res.data;
-  } catch {
-    const items = StorageService.getGallery();
-    const createdItems: GalleryItem[] = files.map((f: any, i) => ({
-      id: `gal-bulk-${Date.now()}-${i}-${Math.floor(Math.random() * 1000)}`,
-      type: f.type || 'Photo',
-      titleEn: f.titleEn || `Uploaded Image ${i + 1}`,
-      titleAr: f.titleAr,
-      imageUrl: f.imageUrl || 'https://images.unsplash.com/photo-1591604466107-ec97de577aff?auto=format&fit=crop&q=80&w=800',
-      location: f.location,
-      description: f.description,
-      isActive: f.isActive ?? true,
-      sortOrder: f.sortOrder || (i + 1),
-      uploadDate: new Date().toISOString().substring(0, 10),
-    }));
-    const newGallery = [...createdItems, ...items];
-    StorageService.setGallery(newGallery);
-    return createdItems;
+    let payload: any;
+    let isFormData = false;
+
+    if (files instanceof FormData) {
+      isFormData = true;
+      payload = files;
+    } else {
+      payload = { items: files };
+    }
+
+    const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
+    
+    console.log('📤 Sending bulk upload payload:', payload);
+    const res = await apiClient.post('/api/admin/gallery/bulk', payload, config);
+    console.log('📡 Bulk upload response:', res.data);
+    
+    const items = extractGalleryItems(res.data);
+    if (items.length > 0) {
+      console.log('✅ Bulk upload successful via API:', items.length, 'items');
+      return items;
+    }
+    
+    if (res.data && res.data.success !== false) {
+      console.log('✅ Bulk upload successful but no items returned, using response data');
+      return res.data.data || res.data.items || [];
+    }
+    
+    console.warn('⚠️ Bulk upload response did not contain items');
+    return [];
+  } catch (error: any) {
+    console.error('❌ Error in bulk upload:', error);
+    throw new Error(error?.response?.data?.error || 'Failed to bulk upload gallery items');
   }
 }
 

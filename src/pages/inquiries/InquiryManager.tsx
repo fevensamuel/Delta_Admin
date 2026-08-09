@@ -12,6 +12,7 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { RoleGuard } from '../../components/common/RoleGuard';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { ensureArray } from '../../api/client';
 import {
   Mail,
   Search,
@@ -58,9 +59,10 @@ export const InquiryManager: React.FC = () => {
     setIsLoading(true);
     try {
       const data = await getInquiriesApi();
-      setInquiries(data);
+      setInquiries(ensureArray<Inquiry>(data));
     } catch {
       showToast('error', 'Failed to load website inquiries');
+      setInquiries([]);
     } finally {
       setIsLoading(false);
     }
@@ -110,12 +112,15 @@ export const InquiryManager: React.FC = () => {
     }
   };
 
-  const filteredInquiries = inquiries.filter((inq) => {
+  // Get the array of inquiries, ensuring it's always an array
+  const inquiriesArray = ensureArray<Inquiry>(inquiries);
+
+  const filteredInquiries = inquiriesArray.filter((inq) => {
     const matchesSearch =
-      inq.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inq.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inq.phone.includes(searchTerm) ||
-      inq.subject.toLowerCase().includes(searchTerm.toLowerCase());
+      inq.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inq.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inq.phone?.includes(searchTerm) ||
+      inq.subject?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || inq.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -236,20 +241,20 @@ export const InquiryManager: React.FC = () => {
                       </td>
 
                       <td className="p-3.5 font-bold text-slate-900 text-sm">
-                        {inq.fullName}
+                        {inq.fullName || 'Unknown'}
                       </td>
 
                       <td className="p-3.5 space-y-0.5">
                         <div className="text-slate-700 font-mono flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-emerald-600" /> {inq.phone}
+                          <Phone className="w-3 h-3 text-emerald-600" /> {inq.phone || 'N/A'}
                         </div>
                         <div className="text-slate-500 text-[11px] flex items-center gap-1">
-                          <Mail className="w-3 h-3 text-sky-600" /> {inq.email}
+                          <Mail className="w-3 h-3 text-sky-600" /> {inq.email || 'N/A'}
                         </div>
                       </td>
 
                       <td className="p-3.5 max-w-xs truncate font-semibold text-slate-800">
-                        {inq.subject}
+                        {inq.subject || 'No Subject'}
                       </td>
 
                       <td className="p-3.5">
@@ -262,12 +267,12 @@ export const InquiryManager: React.FC = () => {
                               : 'bg-green-100 text-green-800'
                           }`}
                         >
-                          {inq.status}
+                          {inq.status || 'New'}
                         </span>
                       </td>
 
                       <td className="p-3.5 text-slate-500">
-                        {inq.dateReceived}
+                        {inq.dateReceived || new Date().toISOString().split('T')[0]}
                       </td>
 
                       <td className="p-3.5 pr-5 text-right">

@@ -6,6 +6,7 @@ import { StatsCard } from '../../components/common/StatsCard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { RoleGuard } from '../../components/common/RoleGuard';
 import { useToast } from '../../context/ToastContext';
+import { useExchangeRateStore } from '../../store/useExchangeRateStore';
 import {
   MousePointerClick,
   Download,
@@ -15,7 +16,8 @@ import {
   Award,
   MessageCircle,
   ExternalLink,
-  ArrowUpRight
+  ArrowUpRight,
+  DollarSign
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -33,6 +35,7 @@ import {
 export const BookingLeads: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { rate } = useExchangeRateStore();
 
   const [packages, setPackages] = useState<Package[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,20 +49,22 @@ export const BookingLeads: React.FC = () => {
     setIsLoading(true);
     try {
       const data = await getPackagesApi();
-      setPackages(data);
+      setPackages(Array.isArray(data) ? data : []);
     } catch {
       showToast('error', 'Failed to load booking lead analytics');
+      setPackages([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const totalClicks = packages.reduce((acc, p) => acc + (p.whatsappClicks || 0), 0);
-  const topPackage = [...packages].sort((a, b) => (b.whatsappClicks || 0) - (a.whatsappClicks || 0))[0];
+  const packagesArray = Array.isArray(packages) ? packages : [];
+  const totalClicks = packagesArray.reduce((acc, p) => acc + (p.whatsappClicks || 0), 0);
+  const topPackage = [...packagesArray].sort((a, b) => (b.whatsappClicks || 0) - (a.whatsappClicks || 0))[0];
 
   // Category chart data
   const categoriesMap: Record<string, number> = {};
-  packages.forEach((p) => {
+  packagesArray.forEach((p) => {
     categoriesMap[p.category] = (categoriesMap[p.category] || 0) + (p.whatsappClicks || 0);
   });
   const categoryPieData = Object.keys(categoriesMap).map((cat) => ({
@@ -70,8 +75,20 @@ export const BookingLeads: React.FC = () => {
   const COLORS = ['#1A5B4B', '#C9A84C', '#3b82f6', '#8b5cf6', '#ec4899'];
 
   const handleExportCsvReport = () => {
-    const headers = ['Package Name', 'Category', 'Price USD', 'Duration Days', 'WhatsApp Clicks'];
-    const rows = packages.map((p) => [`"${p.titleEn}"`, p.category, p.price, p.durationDays, p.whatsappClicks || 0]);
+    if (packagesArray.length === 0) {
+      showToast('info', 'No data to export');
+      return;
+    }
+
+    const headers = ['Package Name', 'Category', 'Price USD', 'Price ETB', 'Duration Days', 'WhatsApp Clicks'];
+    const rows = packagesArray.map((p) => [
+      `"${p.titleEn}"`,
+      p.category,
+      p.priceUsd || p.price || 0,
+      p.priceEtb || Math.round((p.priceUsd || p.price || 0) * rate),
+      p.durationDays || 0,
+      p.whatsappClicks || 0
+    ]);
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const link = document.createElement('a');
     link.href = encodeURI(csvContent);
@@ -79,6 +96,11 @@ export const BookingLeads: React.FC = () => {
     link.click();
     showToast('success', 'Exported WhatsApp booking click report CSV');
   };
+
+  // Calculate average price
+  const avgPrice = packagesArray.length > 0 
+    ? packagesArray.reduce((acc, p) => acc + (p.priceUsd || p.price || 0), 0) / packagesArray.length 
+    : 0;
 
   if (isLoading) {
     return <LoadingSpinner text="Loading Lead Conversion Analytics..." />;
@@ -144,16 +166,18 @@ export const BookingLeads: React.FC = () => {
           />
           <StatsCard
             title="Top Category"
-            value="Economy Umrah"
+            value={categoryPieData.length > 0 ? 
+              categoryPieData.sort((a, b) => b.value - a.value)[0]?.name || 'N/A' : 'N/A'}
             icon={TrendingUp}
-            subtitle="42% of total intent"
+            subtitle={`${categoryPieData.length > 0 ? 
+              Math.round((categoryPieData.sort((a, b) => b.value - a.value)[0]?.value / totalClicks) * 100) : 0}% of total intent`}
             accentColor="sky"
           />
           <StatsCard
-            title="Avg Lead Value"
-            value="$1,850"
-            icon={ArrowUpRight}
-            subtitle="Estimated package value"
+            title="Avg Package Price"
+            value={`$${Math.round(avgPrice)}`}
+            icon={DollarSign}
+            subtitle={`≈ ${Math.round(avgPrice * rate)} ETB`}
             accentColor="purple"
           />
         </div>
@@ -165,7 +189,7 @@ export const BookingLeads: React.FC = () => {
             <h3 className="text-base font-bold text-slate-900">Top Packages by WhatsApp Booking Clicks</h3>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={packages.slice(0, 5)} layout="vertical">
+                <BarChart data={packagesArray.slice(0, 5)} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                   <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} />
                   <YAxis dataKey="titleEn" type="category" width={150} stroke="#475569" fontSize={11} tickLine={false} />
@@ -206,40 +230,55 @@ export const BookingLeads: React.FC = () => {
                 <tr>
                   <th className="p-3.5 pl-5">Package Name</th>
                   <th className="p-3.5">Category</th>
-                  <th className="p-3.5">Price</th>
+                  <th className="p-3.5">Price (USD)</th>
+                  <th className="p-3.5">Price (ETB)</th>
                   <th className="p-3.5">Duration</th>
                   <th className="p-3.5">WhatsApp Clicks</th>
                   <th className="p-3.5 text-right pr-5">Quick Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                {packages.map((pkg) => (
-                  <tr key={pkg.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-3.5 pl-5 font-bold text-slate-900 text-sm">
-                      {pkg.titleEn}
-                    </td>
-                    <td className="p-3.5">
-                      <span className="px-2 py-0.5 rounded bg-slate-100 font-semibold text-slate-700 text-[11px]">
-                        {pkg.category}
-                      </span>
-                    </td>
-                    <td className="p-3.5 font-bold text-slate-900">${pkg.price}</td>
-                    <td className="p-3.5 text-slate-600">{pkg.durationDays} Days</td>
-                    <td className="p-3.5">
-                      <span className="font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                        {pkg.whatsappClicks || 0} clicks
-                      </span>
-                    </td>
-                    <td className="p-3.5 pr-5 text-right">
-                      <button
-                        onClick={() => navigate(`/packages/${pkg.id}/edit`)}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-xs font-semibold inline-flex items-center gap-1 text-[#1A5B4B]"
-                      >
-                        Edit Package <ExternalLink className="w-3.5 h-3.5" />
-                      </button>
+                {packagesArray.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-slate-500">
+                      No package data available.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  packagesArray.map((pkg) => {
+                    const priceUsd = pkg.priceUsd || pkg.price || 0;
+                    const priceEtb = pkg.priceEtb || Math.round(priceUsd * rate);
+                    
+                    return (
+                      <tr key={pkg.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-3.5 pl-5 font-bold text-slate-900 text-sm">
+                          {pkg.titleEn || 'Untitled Package'}
+                        </td>
+                        <td className="p-3.5">
+                          <span className="px-2 py-0.5 rounded bg-slate-100 font-semibold text-slate-700 text-[11px]">
+                            {pkg.category || 'Uncategorized'}
+                          </span>
+                        </td>
+                        <td className="p-3.5 font-bold text-slate-900">${priceUsd.toFixed(2)}</td>
+                        <td className="p-3.5 font-bold text-emerald-700">{priceEtb.toLocaleString()} ETB</td>
+                        <td className="p-3.5 text-slate-600">{pkg.durationDays || 0} Days</td>
+                        <td className="p-3.5">
+                          <span className="font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                            {pkg.whatsappClicks || 0} clicks
+                          </span>
+                        </td>
+                        <td className="p-3.5 pr-5 text-right">
+                          <button
+                            onClick={() => navigate(`/packages/${pkg.id}/edit`)}
+                            className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-100 text-xs font-semibold inline-flex items-center gap-1 text-[#1A5B4B]"
+                          >
+                            Edit Package <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

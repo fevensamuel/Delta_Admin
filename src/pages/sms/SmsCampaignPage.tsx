@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { SmsCampaign, Subscriber } from '../../types';
+import { useLocation } from 'react-router-dom';
+import { SmsCampaign, Subscriber, Package } from '../../types';
 import { getCampaignsApi, sendSmsCampaignApi } from '../../api/sms';
 import { getSubscribersApi } from '../../api/subscribers';
+import { getPackagesApi } from '../../api/packages';
 import { TestSmsModal } from '../../components/modals/TestSmsModal';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -13,20 +15,20 @@ import {
   Send,
   Smartphone,
   Users,
-  CheckCircle2,
   AlertTriangle,
   History,
   FileSpreadsheet,
-  Eye,
-  Info
+  Package as PackageIcon
 } from 'lucide-react';
 
 export const SmsCampaignPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
+  const location = useLocation();
 
   const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Campaign Composer State
@@ -42,23 +44,61 @@ export const SmsCampaignPage: React.FC = () => {
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [isSendConfirmOpen, setIsSendConfirmOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [viewingCampaign, setViewingCampaign] = useState<SmsCampaign | null>(null);
 
   useEffect(() => {
     loadData();
   }, []);
 
+  // Handle incoming route state or query params for pre-selected package
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const paramPkg = location.state?.targetFilter || searchParams.get('package');
+    if (paramPkg) {
+      if (paramPkg.startsWith('Package:')) {
+        setTargetFilter(paramPkg);
+      } else {
+        setTargetFilter(`Package: ${paramPkg}`);
+      }
+    }
+  }, [location.state, location.search]);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [cData, sData] = await Promise.all([getCampaignsApi(), getSubscribersApi()]);
-      setCampaigns(cData);
-      setSubscribers(sData.filter((s) => s.optInStatus === 'Active'));
-    } catch {
+      const [cData, sData, pData] = await Promise.all([
+        getCampaignsApi(),
+        getSubscribersApi(),
+        getPackagesApi()
+      ]);
+      
+      // Ensure campaigns is always an array
+      const campaignData = Array.isArray(cData) ? cData : [];
+      const subscriberData = Array.isArray(sData) ? sData : [];
+      const packageData = Array.isArray(pData) ? pData : [];
+      
+      setCampaigns(campaignData);
+      setSubscribers(subscriberData.filter((s) => s.optInStatus === 'Active'));
+      setPackages(packageData);
+    } catch (error) {
+      console.error('❌ Error loading SMS campaign data:', error);
       showToast('error', 'Failed to load SMS campaign data');
+      // Set empty arrays so UI doesn't break
+      setCampaigns([]);
+      setSubscribers([]);
+      setPackages([]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper to match subscribers to a specific package
+  const getSubscribersForPackage = (pkgTitle: string) => {
+    const cleanPkgName = pkgTitle.replace(/^Package:\s*/i, '').trim().toLowerCase();
+    return subscribers.filter((s) => {
+      if (!s.packageInterest) return false;
+      const interest = s.packageInterest.toLowerCase();
+      return interest.includes(cleanPkgName) || cleanPkgName.includes(interest);
+    });
   };
 
   // Recipient Calculation
@@ -75,6 +115,9 @@ export const SmsCampaignPage: React.FC = () => {
     if (targetFilter === 'Manual Numbers') {
       const numbers = manualNumbers.split(/[\n,;]+/).filter((n) => n.trim().length > 0);
       return numbers.length;
+    }
+    if (targetFilter.startsWith('Package:')) {
+      return getSubscribersForPackage(targetFilter).length;
     }
     return subscribers.length;
   };
@@ -107,7 +150,8 @@ export const SmsCampaignPage: React.FC = () => {
       setIsSendConfirmOpen(false);
       setMessage('');
       loadData();
-    } catch {
+    } catch (error) {
+      console.error('❌ Error sending campaign:', error);
       showToast('error', 'Failed to send campaign');
     } finally {
       setIsSending(false);
@@ -164,12 +208,26 @@ export const SmsCampaignPage: React.FC = () => {
                 <select
                   value={targetFilter}
                   onChange={(e) => setTargetFilter(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-[#C8102E]"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-[#1A5B4B]"
                 >
                   <option value="Active Opt-in">Active Opt-in Subscribers ({subscribers.filter(s => s.optInStatus === 'Active').length})</option>
                   <option value="All Subscribers">All Subscribers ({subscribers.length})</option>
-                  <option value="Package-specific">Package-specific Leads</option>
-                  <option value="Manual Numbers">Manual Numbers Input</option>
+                  
+                  <optgroup label="📦 Package Specific Subscribers">
+                    {packages.map((pkg) => {
+                      const count = getSubscribersForPackage(pkg.titleEn).length;
+                      return (
+                        <option key={pkg.id} value={`Package: ${pkg.titleEn}`}>
+                          {pkg.titleEn} ({count} subscriber{count !== 1 ? 's' : ''})
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+
+                  <optgroup label="⚙️ Other Recipient Filters">
+                    <option value="Package-specific">All Package Leads ({subscribers.filter(s => s.packageInterest).length})</option>
+                    <option value="Manual Numbers">Manual Numbers Input</option>
+                  </optgroup>
                 </select>
               </div>
 
@@ -292,6 +350,7 @@ export const SmsCampaignPage: React.FC = () => {
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <History className="w-5 h-5 text-[#1A5B4B]" /> Sent Campaigns History
             </h3>
+            <span className="text-xs text-slate-500">{campaigns.length} campaigns</span>
           </div>
 
           <div className="overflow-x-auto">

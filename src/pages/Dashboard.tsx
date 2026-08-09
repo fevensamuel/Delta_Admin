@@ -16,7 +16,8 @@ import {
   Plus,
   Upload,
   Send,
-  DollarSign
+  DollarSign,
+  Video
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -55,6 +56,11 @@ export const Dashboard: React.FC = () => {
   if (isLoading || !stats) {
     return <LoadingSpinner text="Loading Dashboard Analytics..." />;
   }
+
+  // Helper to check if item is a video
+  const isVideo = (item: any): boolean => {
+    return item.type === 'Video' || item.type === 'video';
+  };
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300">
@@ -221,21 +227,39 @@ export const Dashboard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {(stats?.recentGalleryUploads || []).slice(0, 4).map((g) => (
-              <div key={g.id} className="p-3 rounded-lg border border-[#E2E8F0] bg-[#F9FAFB] flex items-center gap-3">
-                <img src={g.imageUrl} alt={g.titleEn} className="w-16 h-12 object-cover rounded-lg border shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-[#111827] truncate">{g.titleEn}</p>
-                  <p className="text-[11px] text-[#718096] truncate mt-0.5">{g.description || g.location || 'Website Media'}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] font-bold text-[#C8102E] bg-[#C8102E]/10 px-2 py-0.5 rounded">
-                      {g.type}
-                    </span>
-                    <span className="text-[10px] text-[#718096]">{g.uploadDate}</span>
+            {(stats?.recentGalleryUploads || []).slice(0, 4).map((g) => {
+              const isVideoItem = isVideo(g);
+              
+              return (
+                <div key={g.id} className="p-3 rounded-lg border border-[#E2E8F0] bg-[#F9FAFB] flex items-center gap-3">
+                  {g.imageUrl ? (
+                    <img 
+                      src={g.imageUrl} 
+                      alt={g.titleEn} 
+                      className="w-16 h-12 object-cover rounded-lg border shrink-0"
+                    />
+                  ) : isVideoItem ? (
+                    <div className="w-16 h-12 bg-[#111827] rounded-lg border shrink-0 flex items-center justify-center">
+                      <Video className="w-6 h-6 text-[#C8102E]" />
+                    </div>
+                  ) : (
+                    <div className="w-16 h-12 bg-[#F9FAFB] rounded-lg border shrink-0 flex items-center justify-center">
+                      <ImageIcon className="w-6 h-6 text-[#718096]" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-[#111827] truncate">{g.titleEn}</p>
+                    <p className="text-[11px] text-[#718096] truncate mt-0.5">{g.description || g.location || 'Website Media'}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] font-bold text-[#C8102E] bg-[#C8102E]/10 px-2 py-0.5 rounded">
+                        {g.type || 'Photo'}
+                      </span>
+                      <span className="text-[10px] text-[#718096]">{g.uploadDate || g.createdAt?.substring(0, 10) || ''}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -258,7 +282,7 @@ export const Dashboard: React.FC = () => {
               </button>
 
               <button
-                onClick={() => navigate('/gallery')}
+                onClick={() => navigate('/gallery/bulk-upload')}
                 className="w-full p-3 rounded-lg bg-[#111827] hover:bg-black text-white font-bold text-xs transition-colors flex items-center justify-between shadow-xs"
               >
                 <span className="flex items-center gap-2">

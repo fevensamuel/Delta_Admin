@@ -12,7 +12,7 @@ interface ExchangeRateState {
 const ONE_HOUR_MS = 3600000;
 
 export const useExchangeRateStore = create<ExchangeRateState>((set, get) => ({
-  rate: Number(import.meta.env.VITE_EXCHANGE_RATE_FALLBACK || 159.98),
+  rate: Number(import.meta.env.VITE_EXCHANGE_RATE_FALLBACK || import.meta.env.VITE_EXCHANGE_RATE_FALLE || 159.98),
   lastUpdated: new Date().toISOString(),
   isLoading: false,
 
@@ -31,7 +31,7 @@ export const useExchangeRateStore = create<ExchangeRateState>((set, get) => ({
     set({ isLoading: true });
     try {
       const rate = await getExchangeRate();
-      const validRate = rate && rate > 0 ? rate : Number(import.meta.env.VITE_EXCHANGE_RATE_FALLBACK || 159.98);
+      const validRate = rate && rate > 0 ? rate : Number(import.meta.env.VITE_EXCHANGE_RATE_FALLBACK || import.meta.env.VITE_EXCHANGE_RATE_FALLE || 159.98);
       set({
         rate: validRate,
         lastUpdated: new Date().toISOString(),

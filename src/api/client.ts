@@ -1,22 +1,18 @@
 import axios from 'axios';
-import {
-  INITIAL_PACKAGES,
-  INITIAL_GALLERY,
-  INITIAL_SUBSCRIBERS,
-  INITIAL_CAMPAIGNS,
-  INITIAL_INQUIRIES,
-  INITIAL_USERS,
-  INITIAL_LEAD_STATS
-} from './mockData';
 
-const BASE_URL = ((import.meta as any).env?.VITE_API_URL as string) || 'https://api.deltatravel.com';
+// Get the base URL from environment or use default
+const rawBaseUrl = ((import.meta as any).env?.VITE_API_URL as string) || 'http://localhost:3000/api';
+// Remove trailing /api if present to avoid double slashes
+const BASE_URL = rawBaseUrl.replace(/\/api\/?$/, '');
+
+console.log('🔗 API Base URL:', BASE_URL);
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 5000
+  timeout: 30000 // Increased timeout for video uploads
 });
 
 // Interceptor to inject JWT token
@@ -26,15 +22,43 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log(`📤 ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// In-Memory store cache to ensure instant reactivity and avoid localStorage quota crashes
+// Response interceptor to handle API response structures
+apiClient.interceptors.response.use(
+  (response) => {
+    console.log(`📥 ${response.status} ${response.config.url}`);
+    return response;
+  },
+  (error) => {
+    console.error('❌ API Error:', error.response?.status, error.response?.data || error.message);
+    return Promise.reject(error);
+  }
+);
+
+// Helper function to ensure data is always an array
+export const ensureArray = <T,>(data: any): T[] => {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object') {
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data.results)) return data.results;
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.packages)) return data.packages;
+    if (Array.isArray(data.inquiries)) return data.inquiries;
+    if (Array.isArray(data.subscribers)) return data.subscribers;
+    if (Array.isArray(data.gallery)) return data.gallery;
+  }
+  return [];
+};
+
+// In-Memory store cache
 const memoryStore: Record<string, any> = {};
 
-// Local Storage Helper for Mock Fallback Persistence
+// Local Storage Helper for offline-safe persistence
 export class StorageService {
   private static get<T>(key: string, initialData: T): T {
     if (memoryStore[key]) {
@@ -69,59 +93,53 @@ export class StorageService {
     }
   }
 
-  // Packages
   static getPackages() {
-    return this.get('packages', INITIAL_PACKAGES);
+    return this.get('packages', [] as any[]);
   }
-  static setPackages(data: typeof INITIAL_PACKAGES) {
+  static setPackages(data: any[]) {
     this.set('packages', data);
   }
-
-  // Gallery
   static getGallery() {
-    return this.get('gallery', INITIAL_GALLERY);
+    return this.get('gallery', [] as any[]);
   }
-  static setGallery(data: typeof INITIAL_GALLERY) {
+  static setGallery(data: any[]) {
     this.set('gallery', data);
   }
-
-  // Subscribers
   static getSubscribers() {
-    return this.get('subscribers', INITIAL_SUBSCRIBERS);
+    return this.get('subscribers', [] as any[]);
   }
-  static setSubscribers(data: typeof INITIAL_SUBSCRIBERS) {
+  static setSubscribers(data: any[]) {
     this.set('subscribers', data);
   }
-
-  // Campaigns
   static getCampaigns() {
-    return this.get('campaigns', INITIAL_CAMPAIGNS);
+    return this.get('campaigns', [] as any[]);
   }
-  static setCampaigns(data: typeof INITIAL_CAMPAIGNS) {
+  static setCampaigns(data: any[]) {
     this.set('campaigns', data);
   }
-
-  // Inquiries
   static getInquiries() {
-    return this.get('inquiries', INITIAL_INQUIRIES);
+    return this.get('inquiries', [] as any[]);
   }
-  static setInquiries(data: typeof INITIAL_INQUIRIES) {
+  static setInquiries(data: any[]) {
     this.set('inquiries', data);
   }
-
-  // Users
   static getUsers() {
-    return this.get('users', INITIAL_USERS);
+    return this.get('users', [] as any[]);
   }
-  static setUsers(data: typeof INITIAL_USERS) {
+  static setUsers(data: any[]) {
     this.set('users', data);
   }
-
-  // Lead Stats
   static getLeadStats() {
-    return this.get('lead_stats', INITIAL_LEAD_STATS);
+    return this.get('lead_stats', {
+      totalClicks: 0,
+      todayClicks: 0,
+      thisWeekClicks: 0,
+      thisMonthClicks: 0,
+      packageStats: [],
+      categoryDistribution: []
+    } as any);
   }
-  static setLeadStats(data: typeof INITIAL_LEAD_STATS) {
+  static setLeadStats(data: any) {
     this.set('lead_stats', data);
   }
 }

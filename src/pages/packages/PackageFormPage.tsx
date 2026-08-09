@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Package } from '../../types';
-import { getPackagesApi, createPackageApi, updatePackageApi } from '../../api/packages';
+import { getPackageApi, createPackageApi, updatePackageApi } from '../../api/packages';
 import { PackageForm } from '../../components/forms/PackageForm';
 import { RoleGuard } from '../../components/common/RoleGuard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -25,34 +25,41 @@ export const PackageFormPage: React.FC = () => {
   const loadExistingPackage = async (pkgId: string) => {
     setIsLoading(true);
     try {
-      const allPkgs = await getPackagesApi();
-      const found = allPkgs.find((p) => p.id === pkgId);
+      const found = await getPackageApi(pkgId);
       if (found) {
         setPackageToEdit(found);
+        console.log('✅ Package loaded for edit:', found.titleEn);
       } else {
         showToast('error', 'Package not found');
         navigate('/packages');
       }
-    } catch {
+    } catch (error) {
+      console.error('❌ Error fetching package:', error);
       showToast('error', 'Error fetching package details');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSubmit = async (formData: Omit<Package, 'id' | 'whatsappClicks' | 'createdAt' | 'updatedAt'>) => {
+  const handleSubmit = async (formData: FormData) => {
+    console.log('📤 PackageFormPage - Submitting FormData');
     setIsSaving(true);
     try {
+      let result;
       if (id && packageToEdit) {
-        await updatePackageApi(id, formData);
+        result = await updatePackageApi(id, formData);
+        console.log('✅ Package updated:', result);
         showToast('success', 'Package updated successfully!');
       } else {
-        await createPackageApi(formData);
+        result = await createPackageApi(formData);
+        console.log('✅ Package created:', result);
         showToast('success', 'New package created successfully!');
       }
       navigate('/packages');
-    } catch {
-      showToast('error', 'Failed to save package');
+    } catch (error: any) {
+      console.error('❌ Error saving package:', error);
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to save package. Please check all fields.';
+      showToast('error', errorMessage);
     } finally {
       setIsSaving(false);
     }

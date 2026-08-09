@@ -3,24 +3,37 @@ import { useNavigate } from 'react-router-dom';
 import { bulkUploadGallery } from '../../api/gallery';
 import { RoleGuard } from '../../components/common/RoleGuard';
 import { useToast } from '../../context/ToastContext';
-import { ArrowLeft, Upload, CheckCircle2, AlertCircle, FileImage, X, Loader2, ChevronDown, ChevronUp, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Upload, CheckCircle2, AlertCircle, FileImage, X, Loader2, ChevronDown, ChevronUp, Image as ImageIcon, Video } from 'lucide-react';
 import { compressImageFile } from '../../utils/imageUtils';
 
 interface FileUploadItem {
   id: string;
   file: File;
-  titleEn: string;
-  titleAr: string;
-  location: string;
-  description: string;
-  sortOrder: number;
-  isActive: boolean;
   dataUrl: string;
   status: 'pending' | 'uploading' | 'success' | 'error';
   progress: number;
   errorMessage?: string;
-  isExpanded?: boolean;
+  duration?: string;
 }
+
+interface BulkUploadDetails {
+  titleEn: string;
+  titleAr: string;
+  titleAm: string;
+  location: string;
+  description: string;
+  sortOrder: number;
+  isActive: boolean;
+  type: 'Photo' | 'Video';
+}
+
+// Helper to format video duration
+const formatDuration = (seconds: number): string => {
+  if (!seconds || isNaN(seconds)) return '00:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
 
 export const BulkUploadPage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,42 +43,79 @@ export const BulkUploadPage: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
+  // Common details for all files
+  const [commonDetails, setCommonDetails] = useState<BulkUploadDetails>({
+    titleEn: '',
+    titleAr: '',
+    titleAm: '',
+    location: '',
+    description: '',
+    sortOrder: 1,
+    isActive: true,
+    type: 'Photo'
+  });
+
   const handleFilesAdded = (filesList: FileList | null) => {
     if (!filesList) return;
 
     const filesArray = Array.from(filesList);
-    filesArray.forEach(async (file, idx) => {
-      if (!file.type.startsWith('image/')) {
-        showToast('error', `Skipped non-image file: ${file.name}`);
-        return;
-      }
+    const validFiles = filesArray.filter(file => 
+      file.type.startsWith('image/') || file.type.startsWith('video/')
+    );
 
-      const cleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-      const formattedTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
+    if (validFiles.length === 0) {
+      showToast('error', 'No valid image or video files found.');
+      return;
+    }
 
+    if (validFiles.length !== filesArray.length) {
+      showToast('info', `${validFiles.length} file(s) added. ${filesArray.length - validFiles.length} unsupported file(s) skipped.`);
+    }
+
+    validFiles.forEach(async (file, idx) => {
       try {
-        const compressedDataUrl = await compressImageFile(file);
+        let dataUrl: string;
+        let duration: string | undefined;
+        
+        // If it's a video, create a temporary URL for preview and get duration
+        if (file.type.startsWith('video/')) {
+          dataUrl = URL.createObjectURL(file);
+          
+          // Get video duration
+          const videoElement = document.createElement('video');
+          videoElement.src = dataUrl;
+          videoElement.preload = 'metadata';
+          
+          await new Promise((resolve) => {
+            videoElement.onloadedmetadata = () => {
+              duration = formatDuration(videoElement.duration);
+              resolve(true);
+            };
+            videoElement.onerror = () => {
+              // If metadata can't be loaded, just continue
+              resolve(true);
+            };
+            videoElement.load();
+          });
+        } else {
+          // Compress image
+          dataUrl = await compressImageFile(file);
+        }
+        
         const newItem: FileUploadItem = {
           id: `upload-${Date.now()}-${idx}-${Math.random()}`,
           file,
-          titleEn: formattedTitle,
-          titleAr: '',
-          location: '',
-          description: '',
-          sortOrder: idx + 1,
-          isActive: true,
-          dataUrl: compressedDataUrl,
+          dataUrl,
           status: 'pending',
           progress: 0,
-          isExpanded: false
+          duration: duration
         };
         setUploadQueue((prev) => [...prev, newItem]);
-      } catch {
+      } catch (error) {
+        console.error('Error processing file:', error);
         showToast('error', `Failed to process ${file.name}`);
       }
     });
-
-    showToast('info', `Processing ${filesArray.length} images...`);
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -91,36 +141,53 @@ export const BulkUploadPage: React.FC = () => {
     setUploadQueue((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleUpdateItemField = (id: string, field: keyof FileUploadItem, value: any) => {
-    setUploadQueue((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
-    );
+  const handleClearQueue = () => {
+    if (isUploading) return;
+    setUploadQueue([]);
+    showToast('info', 'Queue cleared');
   };
 
-  const toggleExpand = (id: string) => {
-    setUploadQueue((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, isExpanded: !item.isExpanded } : item))
-    );
+  const handleCommonDetailChange = (field: keyof BulkUploadDetails, value: any) => {
+    setCommonDetails(prev => ({ ...prev, [field]: value }));
   };
 
   const startBatchUpload = async () => {
     if (uploadQueue.length === 0) {
-      showToast('info', 'Please add at least one image file from your device.');
+      showToast('info', 'Please add at least one file from your device.');
+      return;
+    }
+
+    if (!commonDetails.titleEn.trim()) {
+      showToast('error', 'Please enter a Title (English) for all items.');
       return;
     }
 
     setIsUploading(true);
 
-    const payload = uploadQueue.map((item) => ({
-      type: 'Photo' as const,
-      titleEn: item.titleEn.trim() || 'Uploaded Photo',
-      titleAr: item.titleAr.trim() || undefined,
-      imageUrl: item.dataUrl, // Actual device file Data URL!
-      location: item.location.trim() || undefined,
-      description: item.description.trim() || undefined,
-      sortOrder: Number(item.sortOrder) || 1,
-      isActive: item.isActive
-    }));
+    // Prepare FormData
+    const formData = new FormData();
+    
+    // Prepare items array as JSON string
+    const items = uploadQueue.map((item, index) => {
+      const isVideo = item.file.type.startsWith('video/');
+      return {
+        type: isVideo ? 'Video' : 'Photo',
+        titleEn: commonDetails.titleEn.trim(),
+        titleAr: commonDetails.titleAr.trim() || undefined,
+        titleAm: commonDetails.titleAm.trim() || undefined,
+        location: commonDetails.location.trim() || undefined,
+        description: commonDetails.description.trim() || undefined,
+        sortOrder: Number(commonDetails.sortOrder) + index,
+        isActive: commonDetails.isActive,
+        duration: item.duration
+      };
+    });
+    formData.append('items', JSON.stringify(items));
+
+    // Append files
+    uploadQueue.forEach((item, index) => {
+      formData.append('files', item.file);
+    });
 
     try {
       // Update progress animation
@@ -131,27 +198,49 @@ export const BulkUploadPage: React.FC = () => {
         await new Promise((r) => setTimeout(r, 150));
       }
 
-      await bulkUploadGallery(payload);
+      const result = await bulkUploadGallery(formData);
+      console.log('✅ Bulk upload result:', result);
 
       setUploadQueue((prev) =>
         prev.map((item) => ({ ...item, status: 'success', progress: 100 }))
       );
 
-      showToast('success', `Successfully uploaded ${uploadQueue.length} photos to website gallery!`);
+      showToast('success', `Successfully uploaded ${uploadQueue.length} item(s) to website gallery!`);
       setTimeout(() => {
         navigate('/gallery');
-      }, 1000);
-    } catch {
+      }, 1500);
+    } catch (error) {
+      console.error('❌ Bulk upload error:', error);
       setUploadQueue((prev) =>
         prev.map((item) => ({ ...item, status: 'error', errorMessage: 'Upload failed' }))
       );
-      showToast('error', 'Failed to complete bulk upload');
+      showToast('error', 'Failed to complete bulk upload. Please try again.');
     } finally {
       setIsUploading(false);
     }
   };
 
   const completedCount = uploadQueue.filter((i) => i.status === 'success').length;
+
+  // Determine accepted file types based on commonDetails.type
+  const getAcceptTypes = () => {
+    if (commonDetails.type === 'Photo') {
+      return 'image/*';
+    } else {
+      return 'video/*';
+    }
+  };
+
+  // Play video in a modal
+  const [activeVideo, setActiveVideo] = useState<FileUploadItem | null>(null);
+
+  const openVideoPreview = (item: FileUploadItem) => {
+    setActiveVideo(item);
+  };
+
+  const closeVideoPreview = () => {
+    setActiveVideo(null);
+  };
 
   return (
     <RoleGuard module="gallery" action="create">
@@ -164,7 +253,133 @@ export const BulkUploadPage: React.FC = () => {
           >
             <ArrowLeft className="w-4 h-4" /> Back to Gallery
           </button>
-          <h2 className="text-lg font-extrabold text-[#111827]">Bulk Upload Device Photos</h2>
+          <h2 className="text-lg font-extrabold text-[#111827]">Bulk Upload Photos & Videos</h2>
+        </div>
+
+        {/* Common Details Form - Applied to ALL Items */}
+        <div className="bg-white rounded-lg border border-[#E2E8F0] p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="w-5 h-5 text-[#C8102E]" />
+            <h3 className="font-bold text-sm text-[#111827]">Common Details for All Items</h3>
+            <span className="text-xs text-[#718096]">(These details will apply to every item in this upload)</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Title (English) *
+              </label>
+              <input
+                type="text"
+                value={commonDetails.titleEn}
+                onChange={(e) => handleCommonDetailChange('titleEn', e.target.value)}
+                placeholder="e.g. Holy Kaaba & Mataf Courtyard"
+                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Title (Arabic) <span className="text-[#718096] font-normal">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                dir="rtl"
+                value={commonDetails.titleAr}
+                onChange={(e) => handleCommonDetailChange('titleAr', e.target.value)}
+                placeholder="العنوان بالعربية"
+                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Title (Amharic) <span className="text-[#718096] font-normal">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={commonDetails.titleAm}
+                onChange={(e) => handleCommonDetailChange('titleAm', e.target.value)}
+                placeholder="በአማርኛ ርዕስ"
+                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Location <span className="text-[#718096] font-normal">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={commonDetails.location}
+                onChange={(e) => handleCommonDetailChange('location', e.target.value)}
+                placeholder="e.g. Masjid al-Haram, Makkah"
+                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Description <span className="text-[#718096] font-normal">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={commonDetails.description}
+                onChange={(e) => handleCommonDetailChange('description', e.target.value)}
+                placeholder="Brief description..."
+                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Sort Order <span className="text-[#718096] font-normal">(Starting number)</span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={commonDetails.sortOrder}
+                onChange={(e) => handleCommonDetailChange('sortOrder', Number(e.target.value))}
+                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              />
+              <p className="text-[10px] text-[#718096] mt-1">
+                Items will be ordered starting from this number
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Media Type
+              </label>
+              <select
+                value={commonDetails.type}
+                onChange={(e) => handleCommonDetailChange('type', e.target.value as 'Photo' | 'Video')}
+                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              >
+                <option value="Photo">📷 Photo</option>
+                <option value="Video">🎬 Video</option>
+              </select>
+              <p className="text-[10px] text-[#718096] mt-1">
+                File picker will filter for the selected type
+              </p>
+            </div>
+
+            <div className="flex items-end">
+              <div className="flex items-center gap-3">
+                <label className="block text-xs font-bold text-[#111827] mb-1">Status</label>
+                <button
+                  type="button"
+                  onClick={() => handleCommonDetailChange('isActive', !commonDetails.isActive)}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold text-white transition-colors ${
+                    commonDetails.isActive ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-gray-400 hover:bg-gray-500'
+                  }`}
+                >
+                  {commonDetails.isActive ? 'Active' : 'Inactive'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Drag and Drop Container */}
@@ -180,15 +395,17 @@ export const BulkUploadPage: React.FC = () => {
           }`}
         >
           <Upload className="w-12 h-12 text-[#C8102E] mx-auto mb-3" />
-          <h3 className="font-bold text-base text-[#111827]">Drag & Drop Photos From Your Device Here</h3>
-          <p className="text-xs text-[#718096] mt-1 mb-4">Select multiple photos (PNG, JPG, WEBP formats up to 15MB each).</p>
+          <h3 className="font-bold text-base text-[#111827]">Drag & Drop Files From Your Device Here</h3>
+          <p className="text-xs text-[#718096] mt-1 mb-4">
+            {commonDetails.type === 'Photo' ? 'Select multiple photos (PNG, JPG, WEBP)' : 'Select multiple videos (MP4, MOV, AVI)'}
+          </p>
 
           <label className="px-5 py-2.5 rounded-lg bg-[#C8102E] hover:bg-[#A00D24] text-white font-bold text-xs shadow-xs cursor-pointer inline-flex items-center gap-2 transition-all">
-            <FileImage className="w-4 h-4 text-white" /> Browse Photos from Computer
+            <FileImage className="w-4 h-4 text-white" /> Browse Files from Computer
             <input
               type="file"
               multiple
-              accept="image/*"
+              accept={getAcceptTypes()}
               className="hidden"
               onChange={(e) => handleFilesAdded(e.target.files)}
             />
@@ -201,167 +418,117 @@ export const BulkUploadPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="font-bold text-sm text-[#111827]">
-                  Selected Photos Queue ({uploadQueue.length})
+                  Selected Files Queue ({uploadQueue.length})
                 </h4>
-                <p className="text-xs text-[#718096]">You can edit titles, locations, and descriptions for each photo below.</p>
+                <p className="text-xs text-[#718096]">All files will use the common details entered above.</p>
               </div>
               <button
-                onClick={() => setUploadQueue([])}
+                onClick={handleClearQueue}
                 disabled={isUploading}
-                className="text-xs font-semibold text-[#C8102E] hover:underline"
+                className="text-xs font-semibold text-[#C8102E] hover:underline disabled:opacity-50"
               >
-                Clear Queue
+                Clear All
               </button>
             </div>
 
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-              {uploadQueue.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="rounded-lg border border-[#E2E8F0] bg-[#F9FAFB] p-3.5 space-y-3"
-                >
-                  {/* Top Bar of Queue Card */}
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto pr-1">
+              {uploadQueue.map((item) => {
+                const isVideo = item.file.type.startsWith('video/');
+                return (
+                  <div
+                    key={item.id}
+                    className="relative rounded-lg border border-[#E2E8F0] bg-[#F9FAFB] overflow-hidden group"
+                  >
+                    {isVideo ? (
+                      <div 
+                        className="w-full h-32 bg-[#111827] flex items-center justify-center cursor-pointer relative group"
+                        onClick={() => openVideoPreview(item)}
+                      >
+                        <video
+                          src={item.dataUrl}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:bg-black/20 transition-all">
+                          <div className="w-10 h-10 rounded-full bg-[#C8102E] text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                            <svg className="w-5 h-5 fill-current ml-0.5" viewBox="0 0 24 24">
+                              <polygon points="5,3 19,12 5,21" fill="white" />
+                            </svg>
+                          </div>
+                        </div>
+                        <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/70 text-white text-[9px] font-bold rounded">
+                          {item.duration || 'VIDEO'}
+                        </span>
+                        <span className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/70 text-white text-[9px] font-bold rounded">
+                          ▶ Click to play
+                        </span>
+                      </div>
+                    ) : (
                       <img
                         src={item.dataUrl}
                         alt="Preview"
-                        className="w-14 h-12 object-cover rounded-md border border-[#E2E8F0] shrink-0"
+                        className="w-full h-32 object-cover"
                       />
+                    )}
 
-                      <div className="flex-1 min-w-0">
-                        <input
-                          type="text"
-                          value={item.titleEn}
-                          disabled={isUploading}
-                          onChange={(e) => handleUpdateItemField(item.id, 'titleEn', e.target.value)}
-                          placeholder="Photo Title (English) *"
-                          className="w-full px-2.5 py-1 text-xs font-bold rounded border border-[#E2E8F0] text-[#111827] bg-white focus:ring-1 focus:ring-[#C8102E]"
-                        />
+                    {/* Status Overlay */}
+                    {item.status === 'success' && (
+                      <div className="absolute inset-0 bg-emerald-900/40 flex items-center justify-center">
+                        <CheckCircle2 className="w-8 h-8 text-white" />
                       </div>
-                    </div>
+                    )}
 
-                    <div className="flex items-center gap-2">
+                    {item.status === 'error' && (
+                      <div className="absolute inset-0 bg-rose-900/40 flex items-center justify-center">
+                        <AlertCircle className="w-8 h-8 text-white" />
+                      </div>
+                    )}
+
+                    {item.status === 'uploading' && (
+                      <div className="absolute inset-0 bg-[#C8102E]/40 flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 text-white animate-spin" />
+                      </div>
+                    )}
+
+                    {/* Remove Button */}
+                    {item.status === 'pending' && (
                       <button
-                        type="button"
-                        onClick={() => toggleExpand(item.id)}
-                        className="px-2.5 py-1 rounded border border-[#E2E8F0] bg-white text-[11px] font-semibold text-[#2D3748] hover:bg-gray-100 flex items-center gap-1"
+                        onClick={() => handleRemoveQueueItem(item.id)}
+                        disabled={isUploading}
+                        className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors disabled:opacity-50"
                       >
-                        {item.isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        {item.isExpanded ? 'Less Details' : 'More Details'}
+                        <X className="w-3.5 h-3.5" />
                       </button>
+                    )}
 
-                      {/* Status Indicator */}
-                      {item.status === 'success' && (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600">
-                          <CheckCircle2 className="w-4 h-4" /> Uploaded
-                        </span>
-                      )}
-
-                      {item.status === 'error' && (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-[#FC8181]">
-                          <AlertCircle className="w-4 h-4" /> Failed
-                        </span>
-                      )}
-
-                      {item.status === 'uploading' && (
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-[#C8102E]">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        </span>
-                      )}
-
-                      {item.status === 'pending' && (
-                        <button
-                          onClick={() => handleRemoveQueueItem(item.id)}
-                          disabled={isUploading}
-                          className="text-[#718096] hover:text-[#C8102E] p-1"
-                          title="Remove item"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
+                    {/* File Name & Type */}
+                    <div className="p-2 truncate text-[10px] font-medium text-[#718096] flex items-center justify-between">
+                      <span className="truncate">{item.file.name}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 bg-slate-200 rounded">
+                        {isVideo ? 'Video' : 'Photo'}
+                      </span>
                     </div>
+
+                    {/* Progress Bar */}
+                    {item.status === 'uploading' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#E2E8F0]">
+                        <div
+                          className="bg-[#C8102E] h-full transition-all duration-300"
+                          style={{ width: `${item.progress}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
-
-                  {/* Expanded Metadata Inputs */}
-                  {item.isExpanded && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-[#E2E8F0] bg-white p-3 rounded-lg">
-                      <div>
-                        <label className="block text-[11px] font-bold text-[#111827] mb-0.5">Arabic Title</label>
-                        <input
-                          type="text"
-                          dir="rtl"
-                          value={item.titleAr}
-                          onChange={(e) => handleUpdateItemField(item.id, 'titleAr', e.target.value)}
-                          placeholder="العنوان بالعربية"
-                          className="w-full px-2.5 py-1 text-xs rounded border border-[#E2E8F0] text-[#111827]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-[#111827] mb-0.5">Location</label>
-                        <input
-                          type="text"
-                          value={item.location}
-                          onChange={(e) => handleUpdateItemField(item.id, 'location', e.target.value)}
-                          placeholder="e.g. Makkah, Saudi Arabia"
-                          className="w-full px-2.5 py-1 text-xs rounded border border-[#E2E8F0] text-[#111827]"
-                        />
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="block text-[11px] font-bold text-[#111827] mb-0.5">Description</label>
-                        <input
-                          type="text"
-                          value={item.description}
-                          onChange={(e) => handleUpdateItemField(item.id, 'description', e.target.value)}
-                          placeholder="Short description..."
-                          className="w-full px-2.5 py-1 text-xs rounded border border-[#E2E8F0] text-[#111827]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-[#111827] mb-0.5">Sort Order</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={item.sortOrder}
-                          onChange={(e) => handleUpdateItemField(item.id, 'sortOrder', Number(e.target.value))}
-                          className="w-full px-2.5 py-1 text-xs rounded border border-[#E2E8F0] text-[#111827]"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateItemField(item.id, 'isActive', !item.isActive)}
-                          className={`px-3 py-1 rounded text-xs font-bold text-white ${
-                            item.isActive ? 'bg-emerald-600' : 'bg-gray-400'
-                          }`}
-                        >
-                          {item.isActive ? 'Active' : 'Inactive'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Progress Bar */}
-                  {item.status === 'uploading' && (
-                    <div className="w-full bg-[#E2E8F0] h-1.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-[#C8102E] h-full transition-all duration-300"
-                        style={{ width: `${item.progress}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Action Bar */}
             <div className="flex items-center justify-between pt-4 border-t border-[#E2E8F0]">
               <span className="text-xs font-medium text-[#718096]">
-                {completedCount} of {uploadQueue.length} photos ready for bulk publishing.
+                {completedCount} of {uploadQueue.length} files ready for publishing.
               </span>
 
               <div className="flex items-center gap-3">
@@ -374,7 +541,7 @@ export const BulkUploadPage: React.FC = () => {
                 </button>
                 <button
                   onClick={startBatchUpload}
-                  disabled={isUploading || uploadQueue.length === 0}
+                  disabled={isUploading || uploadQueue.length === 0 || !commonDetails.titleEn.trim()}
                   className="px-6 py-2 rounded-lg bg-[#C8102E] hover:bg-[#A00D24] text-white font-bold text-xs shadow-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {isUploading ? (
@@ -383,7 +550,7 @@ export const BulkUploadPage: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <Upload className="w-4 h-4 text-white" /> Start Uploading All
+                      <Upload className="w-4 h-4 text-white" /> Upload All Files
                     </>
                   )}
                 </button>
@@ -392,6 +559,73 @@ export const BulkUploadPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Video Preview Modal */}
+      {activeVideo && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeVideoPreview();
+            }
+          }}
+        >
+          <div className="bg-[#111827] text-white rounded-xl border border-white/10 max-w-4xl w-full overflow-hidden shadow-2xl">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <Video className="w-5 h-5 text-[#C8102E] shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm text-white truncate">{activeVideo.file.name}</h3>
+                  <p className="text-[11px] text-gray-400 truncate">{activeVideo.duration || 'Video Preview'}</p>
+                </div>
+              </div>
+              <button
+                onClick={closeVideoPreview}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 bg-black flex justify-center items-center">
+              <div className="w-full aspect-video max-h-[70vh]">
+                <video
+                  src={activeVideo.dataUrl}
+                  controls
+                  autoPlay
+                  className="w-full h-full rounded-lg shadow-lg object-contain bg-black"
+                  playsInline
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-white/10 bg-[#1A1D20] text-xs text-gray-200">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1 flex-1 min-w-0">
+                  <p className="font-bold text-[#E2E8F0] uppercase tracking-wider text-[10px] text-[#C8102E]">
+                    File Details
+                  </p>
+                  <p className="leading-relaxed text-sm text-gray-200 whitespace-pre-wrap break-words">
+                    Name: {activeVideo.file.name}
+                  </p>
+                  <p className="leading-relaxed text-sm text-gray-200 whitespace-pre-wrap break-words">
+                    Size: {(activeVideo.file.size / (1024 * 1024)).toFixed(2)} MB
+                  </p>
+                  <p className="leading-relaxed text-sm text-gray-200 whitespace-pre-wrap break-words">
+                    Duration: {activeVideo.duration || 'Unknown'}
+                  </p>
+                </div>
+                <button
+                  onClick={closeVideoPreview}
+                  className="px-4 py-2 rounded-lg bg-[#C8102E] hover:bg-[#A00D24] text-white font-bold text-xs shrink-0 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </RoleGuard>
   );
 };

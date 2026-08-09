@@ -18,17 +18,38 @@ export const UserForm: React.FC<UserFormProps> = ({ initialData, onSubmit, onCan
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>(initialData?.role || 'Admin');
   const [status, setStatus] = useState<'Active' | 'Inactive'>(initialData?.status || 'Active');
+  const [passwordError, setPasswordError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !email.trim()) {
-      showToast('error', 'Username and email are required');
+    setPasswordError('');
+
+    // Validation
+    if (!username.trim()) {
+      showToast('error', 'Username is required');
       return;
     }
+    if (!email.trim()) {
+      showToast('error', 'Email is required');
+      return;
+    }
+
+    // Password is required for new users
     if (!initialData && (!password || password.length < 6)) {
+      setPasswordError('Password must be at least 6 characters for new users');
       showToast('error', 'Password must be at least 6 characters for new users');
       return;
     }
+
+    // Log what we're submitting for debugging
+    console.log('📤 UserForm submitting:', {
+      username: username.trim(),
+      email: email.trim(),
+      password: password ? '***' : '(empty)',
+      role,
+      status,
+      isEdit: !!initialData
+    });
 
     onSubmit({
       username: username.trim(),
@@ -80,10 +101,21 @@ export const UserForm: React.FC<UserFormProps> = ({ initialData, onSubmit, onCan
           type="password"
           required={!initialData}
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#1A5B4B]"
+          onChange={(e) => {
+            setPassword(e.target.value);
+            setPasswordError('');
+          }}
+          placeholder={initialData ? '•••••••• (optional)' : '•••••••• (min 6 chars)'}
+          className={`w-full px-3.5 py-2 rounded-xl border ${
+            passwordError ? 'border-red-500' : 'border-slate-300'
+          } text-sm focus:ring-2 focus:ring-[#1A5B4B]`}
         />
+        {passwordError && (
+          <p className="text-red-500 text-[10px] mt-1">{passwordError}</p>
+        )}
+        {!initialData && (
+          <p className="text-[10px] text-slate-400 mt-1">Password must be at least 6 characters</p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -124,8 +156,9 @@ export const UserForm: React.FC<UserFormProps> = ({ initialData, onSubmit, onCan
         <button
           type="submit"
           disabled={isLoading}
-          className="px-5 py-2 rounded-xl bg-[#1A5B4B] text-white text-sm font-semibold hover:bg-[#14483B] shadow-sm disabled:opacity-50"
+          className="px-5 py-2 rounded-xl bg-[#1A5B4B] text-white text-sm font-semibold hover:bg-[#14483B] shadow-sm disabled:opacity-50 flex items-center gap-2"
         >
+          {isLoading && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
           {initialData ? 'Update Account' : 'Create User'}
         </button>
       </div>

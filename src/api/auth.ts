@@ -1,61 +1,49 @@
-import { apiClient, StorageService } from './client';
-import { User } from '../types';
+import { apiClient } from './client';
 
-let failedLoginAttempts = 0;
-let lastFailedAttemptTime = 0;
+export interface LoginResponse {
+  status: string;
+  success: boolean;
+  message: string;
+  token: string;
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    role: string;
+    isActive: boolean;
+    status: string;
+  };
+}
 
-export async function loginApi(usernameOrEmail: string, password: string): Promise<{ token: string; user: User }> {
-  // Check rate limiting (e.g. max 5 attempts in 1 minute)
-  const now = Date.now();
-  if (failedLoginAttempts >= 5 && now - lastFailedAttemptTime < 60000) {
-    const remainingSeconds = Math.ceil((60000 - (now - lastFailedAttemptTime)) / 1000);
-    throw new Error(`Too many failed login attempts. Please wait ${remainingSeconds} seconds before trying again.`);
-  }
-
+export const loginApi = async (usernameOrEmail: string, password: string): Promise<LoginResponse> => {
   try {
-    const res = await apiClient.post('/api/admin/login', { username: usernameOrEmail, password });
-    failedLoginAttempts = 0;
-    return res.data?.data || res.data;
-  } catch {
-    // Local / offline fallback
-    const users = StorageService.getUsers();
-    const cleanInput = usernameOrEmail.trim().toLowerCase();
+    // Backend expects 'username' field - send the email as username
+    const response = await apiClient.post('/api/admin/auth/login', {
+      username: usernameOrEmail,  // This can be email or username
+      password: password
+    });
     
-    // Allow matching by username or email
-    const foundUser = users.find(
-      (u) => (u.username.toLowerCase() === cleanInput || u.email.toLowerCase() === cleanInput) && (u.isActive ?? u.status === 'Active')
-    );
-
-    if (foundUser && password.length >= 4) {
-      failedLoginAttempts = 0;
-      // Generate a realistic JWT token format mock
-      const mockToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(JSON.stringify({ id: foundUser.id, role: foundUser.role }))}.mockSignature12345`;
-      
-      // Update last login
-      foundUser.lastLogin = new Date().toISOString().replace('T', ' ').substring(0, 16);
-      StorageService.setUsers(users);
-
-      return {
-        token: mockToken,
-        user: foundUser
-      };
-    } else {
-      failedLoginAttempts++;
-      lastFailedAttemptTime = Date.now();
-      throw new Error('Invalid username/email or password credentials');
-    }
+    return response.data;
+  } catch (error: any) {
+    // Extract error message from response
+    const errorMessage = error?.response?.data?.error || error?.message || 'Login failed';
+    throw new Error(errorMessage);
   }
-}
+};
 
-export async function getProfileApi(): Promise<User> {
+export const logoutApi = async (): Promise<void> => {
   try {
-    const res = await apiClient.get('/api/admin/me');
-    return res.data?.data || res.data;
+    await apiClient.post('/api/admin/auth/logout');
   } catch {
-    const storedUser = localStorage.getItem('user') || localStorage.getItem('admin_user');
-    if (storedUser) {
-      return JSON.parse(storedUser);
-    }
-    throw new Error('Unauthorized');
+    // Silently handle logout errors
   }
-}
+};
+
+export const getCurrentUserApi = async () => {
+  try {
+    const response = await apiClient.get('/api/admin/auth/me');
+    return response.data;
+  } catch {
+    return null;
+  }
+};

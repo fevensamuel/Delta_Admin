@@ -7,7 +7,7 @@ import { useExchangeRateStore } from '../../store/useExchangeRateStore';
 
 interface PackageFormProps {
   initialData?: Package;
-  onSubmit: (data: Omit<Package, 'id' | 'whatsappClicks' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  onSubmit: (data: FormData) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
 }
@@ -37,34 +37,108 @@ export const PackageForm: React.FC<PackageFormProps> = ({
   
   // Auto-calculated USD Price
   const priceUsdDisplay = rate > 0 ? priceEtb / rate : 0;
-  const [durationDays, setDurationDays] = useState<number>(initialData?.durationDays || 10);
+  const [durationDays, setDurationDays] = useState<number>(initialData?.durationDays || 7);
   
   // Image state & mode
   const [imageUrl, setImageUrl] = useState(
-    initialData?.imageUrl || 'https://images.unsplash.com/photo-1591604466107-ec97de577aff?auto=format&fit=crop&q=80&w=800'
+    initialData?.imageUrl || ''
   );
   const [imageInputMode, setImageInputMode] = useState<'upload' | 'url'>('upload');
   const [dragActive, setDragActive] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [inclusions, setInclusions] = useState<string[]>(
-    initialData?.inclusions || ['Hotel Accommodation', 'Visa Processing', 'Airport Transfers', 'Guided Ziyarat Tours']
+    initialData?.inclusions || []
   );
   const [newInclusion, setNewInclusion] = useState('');
 
   const [availableDates, setAvailableDates] = useState<string[]>(
-    initialData?.availableDates || ['2026-08-15', '2026-09-01']
+    initialData?.availableDates || []
   );
   const [newDateInput, setNewDateInput] = useState('');
 
   const [itinerary, setItinerary] = useState<ItineraryDay[]>(
-    initialData?.itinerary || [
-      { dayNumber: 1, title: 'Arrival in Jeddah & Transfer to Makkah', description: 'Meet at Jeddah Airport and transfer to hotel. Perform Umrah.' },
-      { dayNumber: 2, title: 'Ibadah & Prayer in Makkah', description: 'Prayers at Masjid Al-Haram.' }
-    ]
+    initialData?.itinerary || []
   );
 
   const [status, setStatus] = useState<'Active' | 'Archived' | 'Inactive'>(initialData?.status || 'Active');
+
+  // Flag to prevent auto-generation on initial load in edit mode
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Field errors state for user-friendly messages
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Generate default itinerary based on duration
+  const generateDefaultItinerary = (days: number) => {
+    const defaultTitles = [
+      'Arrival & Welcome',
+      'Day of Worship',
+      'Ziyarat Tour',
+      'Free Day for Ibadah',
+      'Day of Reflection',
+      'Departure Preparation',
+      'Farewell & Return'
+    ];
+    
+    const newItinerary: ItineraryDay[] = [];
+    for (let i = 1; i <= days; i++) {
+      const titleIndex = Math.min(i - 1, defaultTitles.length - 1);
+      newItinerary.push({
+        dayNumber: i,
+        title: `Day ${i}: ${defaultTitles[titleIndex] || 'Religious Program'}`,
+        description: ''
+      });
+    }
+    return newItinerary;
+  };
+
+  // Auto-generate itinerary when duration changes (only after initial load)
+  useEffect(() => {
+    if (isInitialLoad) return;
+    
+    const currentDays = itinerary.length;
+    const targetDays = durationDays;
+    
+    if (targetDays > currentDays) {
+      const newItinerary = [...itinerary];
+      for (let i = currentDays + 1; i <= targetDays; i++) {
+        newItinerary.push({
+          dayNumber: i,
+          title: `Day ${i}: Religious Program`,
+          description: ''
+        });
+      }
+      setItinerary(newItinerary);
+    } else if (targetDays < currentDays && targetDays > 0) {
+      const newItinerary = itinerary.slice(0, targetDays);
+      setItinerary(newItinerary);
+    }
+  }, [durationDays]);
+
+  // Set initial load flag to false after component mounts
+  useEffect(() => {
+    if (initialData) {
+      if (initialData.itinerary && initialData.itinerary.length > 0) {
+        setIsInitialLoad(false);
+      } else {
+        const defaultItinerary = generateDefaultItinerary(initialData.durationDays || durationDays);
+        setItinerary(defaultItinerary);
+        setIsInitialLoad(false);
+      }
+    } else {
+      const defaultItinerary = generateDefaultItinerary(durationDays);
+      setItinerary(defaultItinerary);
+      setIsInitialLoad(false);
+    }
+  }, [initialData]);
+
+  useEffect(() => {
+    if (initialData?.itinerary && initialData.itinerary.length > 0) {
+      setItinerary(initialData.itinerary);
+    }
+  }, [initialData?.itinerary]);
 
   // Handle device image file selection
   const handleImageFileSelect = async (file: File) => {
@@ -73,9 +147,12 @@ export const PackageForm: React.FC<PackageFormProps> = ({
       return;
     }
     try {
+      // Store the file for submission
+      setSelectedImageFile(file);
+      // Show preview
       const compressedDataUrl = await compressImageFile(file);
       setImageUrl(compressedDataUrl);
-      showToast('success', 'Package cover image loaded and compressed from device');
+      showToast('success', 'Package image loaded from device');
     } catch {
       showToast('error', 'Failed to process image file');
     }
@@ -111,6 +188,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
       ...prev,
       { dayNumber: nextDayNum, title: `Day ${nextDayNum} Program`, description: '' }
     ]);
+    setDurationDays(itinerary.length + 1);
   };
 
   const handleUpdateItineraryDay = (index: number, field: keyof ItineraryDay, value: string) => {
@@ -125,41 +203,78 @@ export const PackageForm: React.FC<PackageFormProps> = ({
     setItinerary((prev) =>
       prev.filter((_, i) => i !== index).map((day, idx) => ({ ...day, dayNumber: idx + 1 }))
     );
+    setDurationDays(itinerary.length - 1);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Clear previous errors
+    setFieldErrors({});
+
+    // Validation with user-friendly messages
+    const errors: Record<string, string> = {};
+    
     if (!titleEn.trim()) {
-      showToast('error', 'English Title is required');
-      return;
+      errors.titleEn = 'English Title is required. Please enter a title for your package.';
     }
+    
+    if (!category) {
+      errors.category = 'Category is required. Please select a package category.';
+    }
+    
     if (priceEtb <= 0) {
-      showToast('error', 'ETB Price must be positive and greater than 0');
-      return;
+      errors.priceEtb = 'Valid price is required. Please enter a price greater than 0.';
     }
-    if (!imageUrl) {
-      showToast('error', 'Package cover image is required');
+    
+    if (durationDays <= 0) {
+      errors.durationDays = 'Duration must be at least 1 day. Please enter a valid number of days.';
+    }
+    
+    if (!imageUrl && !selectedImageFile) {
+      errors.imageUrl = 'Image is required. Please upload an image for the package.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const firstError = Object.values(errors)[0];
+      showToast('error', firstError);
       return;
     }
 
     try {
-      await onSubmit({
-        titleEn,
-        titleAr,
-        titleAm,
-        category,
-        priceEtb,
-        priceUsd: priceUsdDisplay,
-        price: priceUsdDisplay,
-        durationDays,
-        imageUrl,
-        inclusions,
-        availableDates,
-        itinerary,
-        status
-      });
-    } catch {
-      // Toast handled by caller
+      const formData = new FormData();
+      
+      // Append all fields
+      formData.append('titleEn', titleEn.trim());
+      formData.append('titleAr', titleAr.trim() || '');
+      formData.append('titleAm', titleAm.trim() || '');
+      formData.append('category', category);
+      formData.append('priceUsd', String(priceUsdDisplay));
+      formData.append('durationDays', String(durationDays));
+      formData.append('departureCity', 'Addis Ababa');
+      formData.append('inclusions', JSON.stringify(inclusions));
+      formData.append('availableDates', JSON.stringify(availableDates));
+      formData.append('itinerary', JSON.stringify(itinerary));
+      formData.append('status', status);
+      formData.append('isActive', String(status === 'Active'));
+
+      // Append image file if selected
+      if (selectedImageFile) {
+        formData.append('packageImage', selectedImageFile);
+      } else if (imageUrl) {
+        // If using URL, send as imageUrl
+        formData.append('imageUrl', imageUrl);
+      }
+
+      console.log('📤 PackageForm - Submitting FormData');
+      await onSubmit(formData);
+    } catch (error: any) {
+      console.error('❌ Submit error:', error);
+      const errorMessage = error?.response?.data?.error || 
+                          error?.message || 
+                          'Failed to create package. Please check all fields and try again.';
+      showToast('error', errorMessage);
     }
   };
 
@@ -227,11 +342,12 @@ export const PackageForm: React.FC<PackageFormProps> = ({
               value={titleEn}
               onChange={(e) => setTitleEn(e.target.value)}
               placeholder="e.g. 14 Days Premium Ramadan Umrah"
-              className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              className={`w-full px-3.5 py-2 rounded-lg border ${fieldErrors.titleEn ? 'border-red-500' : 'border-[#E2E8F0]'} text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]`}
             />
+            {fieldErrors.titleEn && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.titleEn}</p>}
           </div>
           <div>
-            <label className="block text-xs font-bold text-[#111827] mb-1">Title (Arabic)</label>
+            <label className="block text-xs font-bold text-[#111827] mb-1">Title (Arabic) <span className="text-[#718096] font-normal">(Optional)</span></label>
             <input
               type="text"
               dir="rtl"
@@ -242,7 +358,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-[#111827] mb-1">Title (Amharic)</label>
+            <label className="block text-xs font-bold text-[#111827] mb-1">Title (Amharic) <span className="text-[#718096] font-normal">(Optional)</span></label>
             <input
               type="text"
               value={titleAm}
@@ -259,16 +375,17 @@ export const PackageForm: React.FC<PackageFormProps> = ({
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as PackageCategory)}
-              className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              className={`w-full px-3.5 py-2 rounded-lg border ${fieldErrors.category ? 'border-red-500' : 'border-[#E2E8F0]'} text-sm font-medium text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]`}
             >
               <option value="Economy">Economy</option>
               <option value="Standard">Standard</option>
               <option value="Premium">Premium</option>
               <option value="VIP">VIP</option>
             </select>
+            {fieldErrors.category && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.category}</p>}
           </div>
 
-          {/* Primary - Price (ETB) (Admin enters this) */}
+          {/* Primary - Price (ETB) */}
           <div>
             <label htmlFor="priceEtb" className="block text-xs font-bold text-[#111827] mb-1">
               Price (ETB) *
@@ -285,15 +402,16 @@ export const PackageForm: React.FC<PackageFormProps> = ({
                   setPriceEtb(val);
                 }}
                 placeholder="Enter price in Ethiopian Birr (e.g., 185000)"
-                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]"
+                className={`w-full px-3.5 py-2 rounded-lg border ${fieldErrors.priceEtb ? 'border-red-500' : 'border-[#E2E8F0]'} text-sm font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]`}
               />
             </div>
             <p className="text-[10px] text-[#718096] mt-1">
               1 USD = {rate.toFixed(2)} ETB
             </p>
+            {fieldErrors.priceEtb && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.priceEtb}</p>}
           </div>
 
-          {/* Secondary - Price (USD) (Read-only, auto-calculated) */}
+          {/* Secondary - Price (USD) - Auto-calculated */}
           <div>
             <label htmlFor="priceUsd" className="block text-xs font-bold text-[#111827] mb-1">
               Price (USD) - Auto-calculated
@@ -313,16 +431,51 @@ export const PackageForm: React.FC<PackageFormProps> = ({
             </p>
           </div>
 
+          {/* Duration (Days) - CLEARABLE WITH VALIDATION */}
           <div>
             <label className="block text-xs font-bold text-[#111827] mb-1">Duration (Days) *</label>
-            <input
-              type="number"
-              required
-              min={1}
-              value={durationDays}
-              onChange={(e) => setDurationDays(Number(e.target.value))}
-              className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-            />
+            <div className="relative">
+              <input
+                type="number"
+                required
+                min={1}
+                step={1}
+                value={durationDays || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setDurationDays(0);
+                    setFieldErrors(prev => ({ ...prev, durationDays: 'Duration must be at least 1 day' }));
+                  } else {
+                    const num = parseInt(val, 10);
+                    if (!isNaN(num) && num >= 0) {
+                      setDurationDays(num);
+                      if (num > 0) {
+                        setFieldErrors(prev => ({ ...prev, durationDays: '' }));
+                      }
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  if (durationDays <= 0) {
+                    setFieldErrors(prev => ({ ...prev, durationDays: 'Duration must be at least 1 day' }));
+                    showToast('error', 'Duration must be at least 1 day');
+                    setDurationDays(1);
+                  }
+                }}
+                className={`w-full px-3.5 py-2 rounded-lg border ${fieldErrors.durationDays ? 'border-red-500' : 'border-[#E2E8F0]'} text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]`}
+                placeholder="Enter duration in days"
+              />
+              {durationDays <= 0 && !fieldErrors.durationDays && (
+                <p className="text-red-500 text-[10px] mt-1">Duration is required (minimum 1 day)</p>
+              )}
+              {fieldErrors.durationDays && (
+                <p className="text-red-500 text-[10px] mt-1">{fieldErrors.durationDays}</p>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-400 mt-1">
+              ⚡ Itinerary days auto-update when changed ({itinerary.length} days)
+            </p>
           </div>
         </div>
 
@@ -351,7 +504,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-xs font-bold text-[#111827]">
-              Package Cover Image *
+              Package Image *
             </label>
             <div className="flex items-center gap-2">
               <button
@@ -363,7 +516,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
                     : 'bg-[#F9FAFB] text-[#2D3748] border border-[#E2E8F0]'
                 }`}
               >
-                Upload File from Device
+                Upload File
               </button>
               <button
                 type="button"
@@ -387,14 +540,14 @@ export const PackageForm: React.FC<PackageFormProps> = ({
                     <img src={imageUrl} alt="Package Cover" className="w-20 h-16 object-cover rounded-md border border-[#E2E8F0] shrink-0" />
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-[#111827] flex items-center gap-1">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" /> Image Uploaded from Device
+                        <CheckCircle className="w-4 h-4 text-emerald-600" /> Image Loaded
                       </p>
-                      <p className="text-[11px] text-[#718096] truncate mt-0.5">Ready for package listing</p>
+                      <p className="text-[11px] text-[#718096] truncate mt-0.5">{selectedImageFile?.name || 'Ready for upload'}</p>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setImageUrl('')}
+                    onClick={() => { setImageUrl(''); setSelectedImageFile(null); }}
                     className="px-3 py-1.5 text-xs font-bold text-[#C8102E] hover:bg-rose-50 rounded-lg border border-[#E2E8F0]"
                   >
                     Change Image
@@ -426,7 +579,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
                     }}
                   />
                   <Upload className="w-8 h-8 text-[#C8102E] mx-auto mb-2" />
-                  <p className="text-xs font-bold text-[#111827]">Click or drag to upload package photo from device</p>
+                  <p className="text-xs font-bold text-[#111827]">Click or drag to upload package image</p>
                   <p className="text-[11px] text-[#718096] mt-1">PNG, JPG, WEBP supported</p>
                 </div>
               )}
@@ -437,14 +590,18 @@ export const PackageForm: React.FC<PackageFormProps> = ({
                 <input
                   type="url"
                   value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
+                  onChange={(e) => {
+                    setImageUrl(e.target.value);
+                    setSelectedImageFile(null);
+                  }}
                   placeholder="https://images.unsplash.com/photo-..."
-                  className="flex-1 px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+                  className={`w-full px-3.5 py-2 rounded-lg border ${fieldErrors.imageUrl ? 'border-red-500' : 'border-[#E2E8F0]'} text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]`}
                 />
-                {imageUrl && (
+                {imageUrl && imageUrl.startsWith('http') && (
                   <img src={imageUrl} alt="Preview" className="w-12 h-10 object-cover rounded-lg border border-[#E2E8F0] shrink-0" />
                 )}
               </div>
+              {fieldErrors.imageUrl && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.imageUrl}</p>}
             </div>
           )}
         </div>
@@ -479,18 +636,22 @@ export const PackageForm: React.FC<PackageFormProps> = ({
           </div>
 
           <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-            {inclusions.map((inc, i) => (
-              <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-[#F9FAFB] border border-[#E2E8F0] text-xs text-[#2D3748] font-medium">
-                <span>{inc}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveInclusion(i)}
-                  className="text-[#718096] hover:text-[#C8102E] transition-colors p-1"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+            {inclusions.length === 0 ? (
+              <p className="text-xs text-[#718096] italic">No inclusions added yet</p>
+            ) : (
+              inclusions.map((inc, i) => (
+                <div key={i} className="flex items-center justify-between p-2.5 rounded-lg bg-[#F9FAFB] border border-[#E2E8F0] text-xs text-[#2D3748] font-medium">
+                  <span>{inc}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveInclusion(i)}
+                    className="text-[#718096] hover:text-[#C8102E] transition-colors p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -514,19 +675,23 @@ export const PackageForm: React.FC<PackageFormProps> = ({
           </div>
 
           <div className="flex flex-wrap gap-2 pt-1">
-            {availableDates.map((dateStr) => (
-              <div key={dateStr} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C8102E]/10 border border-[#C8102E]/20 text-[#C8102E] text-xs font-semibold">
-                <Calendar className="w-3.5 h-3.5 text-[#C8102E]" />
-                <span>{dateStr}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveDate(dateStr)}
-                  className="text-[#C8102E] hover:text-[#A00D24] transition-colors ml-1"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
+            {availableDates.length === 0 ? (
+              <p className="text-xs text-[#718096] italic">No dates added yet</p>
+            ) : (
+              availableDates.map((dateStr) => (
+                <div key={dateStr} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C8102E]/10 border border-[#C8102E]/20 text-[#C8102E] text-xs font-semibold">
+                  <Calendar className="w-3.5 h-3.5 text-[#C8102E]" />
+                  <span>{dateStr}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveDate(dateStr)}
+                    className="text-[#C8102E] hover:text-[#A00D24] transition-colors ml-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -536,7 +701,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-[#111827]">Day-by-Day Itinerary</h3>
-            <p className="text-xs text-[#718096]">Specify schedule details for each day of the journey.</p>
+            <p className="text-xs text-[#718096]">Specify schedule details for each day of the journey. ({itinerary.length} days)</p>
           </div>
           <button
             type="button"
@@ -547,40 +712,47 @@ export const PackageForm: React.FC<PackageFormProps> = ({
           </button>
         </div>
 
-        <div className="space-y-4">
-          {itinerary.map((day, idx) => (
-            <div key={idx} className="p-4 rounded-lg border border-[#E2E8F0] bg-[#F9FAFB] space-y-3 relative group">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold px-2.5 py-1 rounded bg-[#111827] text-white">
-                  Day {day.dayNumber}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveItineraryDay(idx)}
-                  className="text-[#718096] hover:text-[#C8102E] p-1 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  value={day.title}
-                  onChange={(e) => handleUpdateItineraryDay(idx, 'title', e.target.value)}
-                  placeholder="Day title (e.g. Arrival in Makkah)"
-                  className="w-full px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-sm bg-white text-[#111827]"
-                />
-                <input
-                  type="text"
-                  value={day.description}
-                  onChange={(e) => handleUpdateItineraryDay(idx, 'description', e.target.value)}
-                  placeholder="Day description details..."
-                  className="w-full px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-sm bg-white text-[#111827]"
-                />
-              </div>
+        <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+          {itinerary.length === 0 ? (
+            <div className="text-center py-8 text-[#718096]">
+              <p className="text-sm font-medium">No itinerary days set.</p>
+              <p className="text-xs mt-1">Click "Add Day" to start building the itinerary.</p>
             </div>
-          ))}
+          ) : (
+            itinerary.map((day, idx) => (
+              <div key={idx} className="p-4 rounded-lg border border-[#E2E8F0] bg-[#F9FAFB] space-y-3 relative group">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold px-2.5 py-1 rounded bg-[#111827] text-white">
+                    Day {day.dayNumber}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItineraryDay(idx)}
+                    className="text-[#718096] hover:text-[#C8102E] p-1 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    value={day.title}
+                    onChange={(e) => handleUpdateItineraryDay(idx, 'title', e.target.value)}
+                    placeholder="Day title (e.g. Arrival in Makkah)"
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-sm bg-white text-[#111827]"
+                  />
+                  <input
+                    type="text"
+                    value={day.description}
+                    onChange={(e) => handleUpdateItineraryDay(idx, 'description', e.target.value)}
+                    placeholder="Day description details..."
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-sm bg-white text-[#111827]"
+                  />
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

@@ -1,12 +1,33 @@
-import { apiClient, StorageService } from './client';
+import { apiClient } from './client';
 import { SmsCampaign } from '../types';
 
 export async function getCampaignsApi(): Promise<SmsCampaign[]> {
   try {
-    const res = await apiClient.get('/api/admin/sms/logs');
-    return res.data?.data || res.data;
-  } catch {
-    return StorageService.getCampaigns();
+    const res = await apiClient.get('/api/admin/sms/campaigns');
+    console.log('📡 SMS campaigns response:', res.data);
+    
+    // Handle different response structures
+    if (res.data && typeof res.data === 'object') {
+      // If response has a data property that is an array
+      if (Array.isArray(res.data.data)) {
+        return res.data.data;
+      }
+      // If response has a count property and data property
+      if (res.data.count !== undefined && Array.isArray(res.data.data)) {
+        return res.data.data;
+      }
+      // If response is directly an array
+      if (Array.isArray(res.data)) {
+        return res.data;
+      }
+    }
+    
+    // If we can't extract campaigns, return empty array
+    console.warn('⚠️ Could not extract campaigns from response, returning empty array');
+    return [];
+  } catch (error) {
+    console.error('❌ Error loading SMS campaigns:', error);
+    return [];
   }
 }
 
@@ -19,31 +40,12 @@ export async function sendSmsCampaignApi(campaignData: {
 }): Promise<SmsCampaign> {
   try {
     const res = await apiClient.post('/api/admin/sms/campaign', campaignData);
-    return res.data;
-  } catch {
-    const subscribers = StorageService.getSubscribers().filter((s) => s.optInStatus === 'Active');
-    const campaigns = StorageService.getCampaigns();
-
-    const recipientLogs = subscribers.map((sub) => ({
-      phone: sub.phone,
-      name: sub.email ? sub.email.split('@')[0] : 'Subscriber',
-      status: 'Delivered' as const
-    }));
-
-    const newCampaign: SmsCampaign = {
-      id: `cmp-${Date.now()}`,
-      name: campaignData.name,
-      targetFilter: campaignData.targetFilter,
-      message: campaignData.message,
-      recipientsCount: recipientLogs.length,
-      sentDate: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      status: 'Delivered',
-      recipients: recipientLogs
-    };
-
-    campaigns.unshift(newCampaign);
-    StorageService.setCampaigns(campaigns);
-    return newCampaign;
+    // Handle response structure
+    const data = res.data?.data || res.data;
+    return data;
+  } catch (error) {
+    console.error('❌ Error sending SMS campaign:', error);
+    throw new Error((error as Error)?.message || 'Failed to send SMS campaign');
   }
 }
 
