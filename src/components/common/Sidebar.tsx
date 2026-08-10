@@ -9,7 +9,6 @@ import {
   MessageSquare,
   Mail,
   BarChart3,
-  UserCog,
   LogOut,
   X,
   Compass,
@@ -22,41 +21,29 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
 
   const mainManagementNav = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, module: 'dashboard' },
-    { label: 'Package Manager', path: '/packages', icon: Package, module: 'packages' },
-    { label: 'Gallery Manager', path: '/gallery', icon: ImageIcon, module: 'gallery' },
+    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Package Manager', path: '/packages', icon: Package },
+    { label: 'Gallery Manager', path: '/gallery', icon: ImageIcon },
   ];
 
   const communicationsNav = [
-    { label: 'Inquiries', path: '/inquiries', icon: Mail, module: 'inquiries' },
-    { label: 'Subscribers', path: '/subscribers', icon: Users, module: 'subscribers' },
-    { label: 'SMS Campaigns', path: '/sms', icon: Send, module: 'sms' },
-    { label: 'Booking Leads', path: '/leads', icon: BarChart3, module: 'leads' },
+    { label: 'Inquiries', path: '/inquiries', icon: Mail },
+    { label: 'Subscribers', path: '/subscribers', icon: Users },
+    { label: 'SMS Campaigns', path: '/sms', icon: Send },
+    { label: 'Booking Leads', path: '/leads', icon: BarChart3 },
   ];
 
-  const systemNav = [
-    { label: 'User Management', path: '/users', icon: UserCog, requiresSuperAdmin: true, module: 'users' },
-  ];
-
-  const renderNavGroup = (title: string, items: Array<{ label: string; path: string; icon: any; module?: string; requiresSuperAdmin?: boolean }>) => (
+  const renderNavGroup = (title: string, items: Array<{ label: string; path: string; icon: any }>) => (
     <div className="mb-4">
       <div className="px-4 mb-2 text-[10px] uppercase tracking-wider text-[#9CA3AF] font-bold">
         {title}
       </div>
       <div className="space-[#1F2937] space-y-0.5">
         {items.map((item) => {
-          if ('requiresSuperAdmin' in item && item.requiresSuperAdmin && user?.role !== 'SuperAdmin') {
-            return null;
-          }
-
-          if (item.module && !hasPermission(item.module, 'view')) {
-            return null;
-          }
-
           const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
 
           return (
@@ -117,18 +104,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <nav className="flex-1 py-4 overflow-y-auto">
           {renderNavGroup('Main Management', mainManagementNav)}
           {renderNavGroup('Communications & Leads', communicationsNav)}
-          {user?.role === 'SuperAdmin' && renderNavGroup('System & Security', systemNav)}
         </nav>
 
         {/* User Card Footer */}
         <div className="p-4 bg-[#0F172A] border-t border-[#ffffff15]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-[#C8102E] flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
-              {user?.username.substring(0, 2).toUpperCase() || 'AD'}
+              {user?.username ? user.username.substring(0, 2).toUpperCase() : 'AD'}
             </div>
             <div className="overflow-hidden min-w-0 flex-1">
-              <p className="text-xs font-bold text-white truncate">{user?.username}</p>
-              <p className="text-[10px] text-[#FC8181] uppercase font-bold">{user?.role}</p>
+              <p className="text-xs font-bold text-white truncate">{user?.username || 'Admin'}</p>
+              <p className="text-[10px] text-[#FC8181] uppercase font-bold">Admin</p>
             </div>
             <button
               onClick={() => logout('Logged out successfully')}

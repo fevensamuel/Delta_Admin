@@ -17,7 +17,7 @@ const SubscriberManager = lazy(() => import('./pages/subscribers/SubscriberManag
 const SmsCampaignPage = lazy(() => import('./pages/sms/SmsCampaignPage').then((m) => ({ default: m.SmsCampaignPage })));
 const InquiryManager = lazy(() => import('./pages/inquiries/InquiryManager').then((m) => ({ default: m.InquiryManager })));
 const BookingLeads = lazy(() => import('./pages/leads/BookingLeads').then((m) => ({ default: m.BookingLeads })));
-const UserManagement = lazy(() => import('./pages/users/UserManagement').then((m) => ({ default: m.UserManagement })));
+// UserManagement import removed
 
 // Protected App Layout Wrapper
 const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -161,16 +161,6 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedLayout>
               <BookingLeads />
-            </ProtectedLayout>
-          }
-        />
-
-        {/* User & RBAC Management */}
-        <Route
-          path="/users"
-          element={
-            <ProtectedLayout>
-              <UserManagement />
             </ProtectedLayout>
           }
         />
