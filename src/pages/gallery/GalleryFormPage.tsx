@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { GalleryItem, GalleryType } from '../../types';
 import { getGalleryItem, createGalleryItem, updateGalleryItem } from '../../api/gallery';
-import { RoleGuard } from '../../components/common/RoleGuard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
 import { ArrowLeft, Upload, Video, Image as ImageIcon, Save, X, Link, Clock, CheckCircle } from 'lucide-react';
@@ -274,340 +273,338 @@ export const GalleryFormPage: React.FC = () => {
   }
 
   return (
-    <RoleGuard module="gallery" action={id ? 'edit' : 'create'}>
-      <div className="max-w-3xl mx-auto space-y-6 pb-12 animate-in fade-in">
-        {/* Top Header */}
-        <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-4">
-          <button
-            type="button"
-            onClick={() => navigate('/gallery')}
-            className="flex items-center gap-2 text-sm font-semibold text-[#2D3748] hover:text-[#C8102E] transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Gallery
-          </button>
-          <h2 className="text-lg font-extrabold text-[#111827]">
-            {id ? 'Edit Gallery Item' : 'Create Gallery Item'}
-          </h2>
+    <div className="max-w-3xl mx-auto space-y-6 pb-12 animate-in fade-in">
+      {/* Top Header */}
+      <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-4">
+        <button
+          type="button"
+          onClick={() => navigate('/gallery')}
+          className="flex items-center gap-2 text-sm font-semibold text-[#2D3748] hover:text-[#C8102E] transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Gallery
+        </button>
+        <h2 className="text-lg font-extrabold text-[#111827]">
+          {id ? 'Edit Gallery Item' : 'Create Gallery Item'}
+        </h2>
+      </div>
+
+      {/* Form Container */}
+      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg border border-[#E2E8F0] shadow-xs space-y-6">
+        {/* Type Selector */}
+        <div>
+          <label className="block text-xs font-bold text-[#111827] mb-2">Media Type *</label>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setType('Photo')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
+                type === 'Photo'
+                  ? 'bg-[#C8102E] text-white border-[#C8102E] shadow-sm'
+                  : 'bg-[#F9FAFB] text-[#2D3748] border-[#E2E8F0] hover:bg-[#E2E8F0]'
+              }`}
+            >
+              <ImageIcon className="w-4 h-4" /> Photo
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setType('Video')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
+                type === 'Video'
+                  ? 'bg-[#111827] text-white border-[#111827] shadow-sm'
+                  : 'bg-[#F9FAFB] text-[#2D3748] border-[#E2E8F0] hover:bg-[#E2E8F0]'
+              }`}
+            >
+              <Video className="w-4 h-4 text-[#C8102E]" /> Video
+            </button>
+          </div>
         </div>
 
-        {/* Form Container */}
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg border border-[#E2E8F0] shadow-xs space-y-6">
-          {/* Type Selector */}
+        {/* Titles */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-[#111827] mb-2">Media Type *</label>
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => setType('Photo')}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
-                  type === 'Photo'
-                    ? 'bg-[#C8102E] text-white border-[#C8102E] shadow-sm'
-                    : 'bg-[#F9FAFB] text-[#2D3748] border-[#E2E8F0] hover:bg-[#E2E8F0]'
-                }`}
-              >
-                <ImageIcon className="w-4 h-4" /> Photo
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setType('Video')}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
-                  type === 'Video'
-                    ? 'bg-[#111827] text-white border-[#111827] shadow-sm'
-                    : 'bg-[#F9FAFB] text-[#2D3748] border-[#E2E8F0] hover:bg-[#E2E8F0]'
-                }`}
-              >
-                <Video className="w-4 h-4 text-[#C8102E]" /> Video
-              </button>
-            </div>
-          </div>
-
-          {/* Titles */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-[#111827] mb-1">Title (English) *</label>
-              <input
-                type="text"
-                required
-                value={titleEn}
-                onChange={(e) => setTitleEn(e.target.value)}
-                placeholder="e.g. Masjid al-Haram Golden Hour"
-                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#111827] mb-1">Title (Arabic) - Optional</label>
-              <input
-                type="text"
-                dir="rtl"
-                value={titleAr}
-                onChange={(e) => setTitleAr(e.target.value)}
-                placeholder="المسجد الحرام"
-                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-              />
-            </div>
-          </div>
-
-          {type === 'Photo' && (
-            <div>
-              <label className="block text-xs font-bold text-[#111827] mb-1">
-                Upload Image Thumbnail from Device *
-              </label>
-
-              {imageUrl ? (
-                <div className="relative rounded-lg border border-[#E2E8F0] overflow-hidden bg-[#F9FAFB] p-3 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={imageUrl}
-                      alt="Uploaded Thumbnail"
-                      className="w-20 h-16 object-cover rounded-md border border-[#E2E8F0] shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" /> Image Uploaded from Device
-                      </p>
-                      <p className="text-[11px] text-[#718096] truncate mt-0.5">Ready for display on public website gallery</p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setImageUrl('')}
-                    className="px-3 py-1.5 text-xs font-bold text-[#C8102E] hover:bg-rose-50 rounded-lg border border-[#E2E8F0] transition-colors"
-                  >
-                    Change Image
-                  </button>
-                </div>
-              ) : (
-                <div
-                  onDragOver={(e) => { e.preventDefault(); setImageDragActive(true); }}
-                  onDragLeave={() => setImageDragActive(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setImageDragActive(false);
-                    if (e.dataTransfer.files?.[0]) handleImageFileSelect(e.dataTransfer.files[0]);
-                  }}
-                  onClick={() => imageInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
-                    imageDragActive
-                      ? 'border-[#C8102E] bg-rose-50/50'
-                      : 'border-[#E2E8F0] hover:border-[#C8102E] bg-[#F9FAFB]'
-                  }`}
-                >
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files?.[0]) handleImageFileSelect(e.target.files[0]);
-                    }}
-                  />
-                  <Upload className="w-8 h-8 text-[#C8102E] mx-auto mb-2" />
-                  <p className="text-xs font-bold text-[#111827]">Click or drag to upload image from device</p>
-                  <p className="text-[11px] text-[#718096] mt-1">PNG, JPG, WEBP formats supported</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Video Options (Upload from device OR Video Stream URL) */}
-          {type === 'Video' && (
-            <div className="space-y-4 p-5 rounded-lg bg-[#111827]/5 border border-[#111827]/15">
-              <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
-                <span className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
-                  <Video className="w-4 h-4 text-[#C8102E]" /> Video Source Selection
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setVideoSourceType('upload')}
-                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
-                      videoSourceType === 'upload'
-                        ? 'bg-[#C8102E] text-white shadow-xs'
-                        : 'bg-white text-[#2D3748] border border-[#E2E8F0]'
-                    }`}
-                  >
-                    Upload from Device
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVideoSourceType('url')}
-                    className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
-                      videoSourceType === 'url'
-                        ? 'bg-[#C8102E] text-white shadow-xs'
-                        : 'bg-white text-[#2D3748] border border-[#E2E8F0]'
-                    }`}
-                  >
-                    Video Stream URL
-                  </button>
-                </div>
-              </div>
-
-              {videoSourceType === 'upload' ? (
-                <div>
-                  <label className="block text-xs font-bold text-[#111827] mb-1">
-                    Upload Video File from Device
-                  </label>
-                  {videoUrl && !videoUrl.startsWith('http') ? (
-                    <div className="p-3 bg-white rounded-lg border border-[#E2E8F0] flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#111827] flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" /> Video Loaded from Device
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => { setVideoUrl(''); setDuration(''); }}
-                        className="text-xs text-[#C8102E] font-bold hover:underline"
-                      >
-                        Remove Video
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      onDragOver={(e) => { e.preventDefault(); setVideoDragActive(true); }}
-                      onDragLeave={() => setVideoDragActive(false)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setVideoDragActive(false);
-                        if (e.dataTransfer.files?.[0]) handleVideoFileSelect(e.dataTransfer.files[0]);
-                      }}
-                      onClick={() => videoInputRef.current?.click()}
-                      className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
-                        videoDragActive
-                          ? 'border-[#C8102E] bg-rose-50/50'
-                          : 'border-[#E2E8F0] hover:border-[#C8102E] bg-white'
-                      }`}
-                    >
-                      <input
-                        ref={videoInputRef}
-                        type="file"
-                        accept="video/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files?.[0]) handleVideoFileSelect(e.target.files[0]);
-                        }}
-                      />
-                      <Video className="w-8 h-8 text-[#111827] mx-auto mb-1" />
-                      <p className="text-xs font-bold text-[#111827]">Click or drag to upload video file</p>
-                      <p className="text-[11px] text-[#718096]">MP4, WEBM formats (Duration is auto-calculated)</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-bold text-[#111827] mb-1">
-                    Video Stream URL (YouTube, Vimeo, MP4 link)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="url"
-                      value={videoUrl}
-                      onChange={handleVideoUrlChange}
-                      placeholder="https://www.youtube.com/watch?v=... or direct MP4 link"
-                      className="w-full pl-9 pr-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-                    />
-                    <Link className="w-4 h-4 text-[#718096] absolute left-3 top-2.5" />
-                  </div>
-                  <p className="text-[10px] text-[#718096] mt-1">
-                    Duration will auto-calculate for direct video URLs (MP4, WEBM)
-                  </p>
-                </div>
-              )}
-
-              {/* Auto Calculated Video Duration field */}
-              <div className="flex items-center gap-3 pt-2">
-                <div className="flex-1">
-                  <label className="block text-xs font-bold text-[#111827] mb-1 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#C8102E]" /> Video Duration
-                    <span className="font-normal text-[#718096]">(Auto-calculated or enter manually)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    placeholder="e.g. 02:45"
-                    className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#111827] bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Location & Sort Order */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-[#111827] mb-1">Location</label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Makkah, Saudi Arabia"
-                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#111827] mb-1">Sort Order (Ordering Index)</label>
-              <input
-                type="number"
-                min={1}
-                value={sortOrder}
-                onChange={(e) => setSortOrder(Number(e.target.value))}
-                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-              />
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-bold text-[#111827] mb-1">Description</label>
-            <textarea
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short descriptive caption for website visitors..."
+            <label className="block text-xs font-bold text-[#111827] mb-1">Title (English) *</label>
+            <input
+              type="text"
+              required
+              value={titleEn}
+              onChange={(e) => setTitleEn(e.target.value)}
+              placeholder="e.g. Masjid al-Haram Golden Hour"
               className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
             />
           </div>
+          <div>
+            <label className="block text-xs font-bold text-[#111827] mb-1">Title (Arabic) - Optional</label>
+            <input
+              type="text"
+              dir="rtl"
+              value={titleAr}
+              onChange={(e) => setTitleAr(e.target.value)}
+              placeholder="المسجد الحرام"
+              className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+            />
+          </div>
+        </div>
 
-          {/* Active / Inactive Toggle */}
-          <div className="flex items-center justify-between p-4 bg-[#F9FAFB] rounded-lg border border-[#E2E8F0]">
-            <div>
-              <span className="text-xs font-bold text-[#111827] block">Active Status</span>
-              <span className="text-[11px] text-[#718096]">When active, item is publicly visible in website gallery.</span>
+        {type === 'Photo' && (
+          <div>
+            <label className="block text-xs font-bold text-[#111827] mb-1">
+              Upload Image Thumbnail from Device *
+            </label>
+
+            {imageUrl ? (
+              <div className="relative rounded-lg border border-[#E2E8F0] overflow-hidden bg-[#F9FAFB] p-3 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <img
+                    src={imageUrl}
+                    alt="Uploaded Thumbnail"
+                    className="w-20 h-16 object-cover rounded-md border border-[#E2E8F0] shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" /> Image Uploaded from Device
+                    </p>
+                    <p className="text-[11px] text-[#718096] truncate mt-0.5">Ready for display on public website gallery</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setImageUrl('')}
+                  className="px-3 py-1.5 text-xs font-bold text-[#C8102E] hover:bg-rose-50 rounded-lg border border-[#E2E8F0] transition-colors"
+                >
+                  Change Image
+                </button>
+              </div>
+            ) : (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setImageDragActive(true); }}
+                onDragLeave={() => setImageDragActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setImageDragActive(false);
+                  if (e.dataTransfer.files?.[0]) handleImageFileSelect(e.dataTransfer.files[0]);
+                }}
+                onClick={() => imageInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
+                  imageDragActive
+                    ? 'border-[#C8102E] bg-rose-50/50'
+                    : 'border-[#E2E8F0] hover:border-[#C8102E] bg-[#F9FAFB]'
+                }`}
+              >
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) handleImageFileSelect(e.target.files[0]);
+                  }}
+                />
+                <Upload className="w-8 h-8 text-[#C8102E] mx-auto mb-2" />
+                <p className="text-xs font-bold text-[#111827]">Click or drag to upload image from device</p>
+                <p className="text-[11px] text-[#718096] mt-1">PNG, JPG, WEBP formats supported</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Video Options (Upload from device OR Video Stream URL) */}
+        {type === 'Video' && (
+          <div className="space-y-4 p-5 rounded-lg bg-[#111827]/5 border border-[#111827]/15">
+            <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+              <span className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
+                <Video className="w-4 h-4 text-[#C8102E]" /> Video Source Selection
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVideoSourceType('upload')}
+                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                    videoSourceType === 'upload'
+                      ? 'bg-[#C8102E] text-white shadow-xs'
+                      : 'bg-white text-[#2D3748] border border-[#E2E8F0]'
+                  }`}
+                >
+                  Upload from Device
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVideoSourceType('url')}
+                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                    videoSourceType === 'url'
+                      ? 'bg-[#C8102E] text-white shadow-xs'
+                      : 'bg-white text-[#2D3748] border border-[#E2E8F0]'
+                  }`}
+                >
+                  Video Stream URL
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsActive(!isActive)}
-              className={`px-4 py-2 rounded-lg font-bold text-xs transition-colors ${
-                isActive ? 'bg-[#48BB78] text-white' : 'bg-[#FC8181] text-white'
-              }`}
-            >
-              {isActive ? 'Active' : 'Inactive'}
-            </button>
-          </div>
 
-          {/* Footer Form Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => navigate('/gallery')}
-              className="px-5 py-2.5 rounded-lg border border-[#E2E8F0] text-[#2D3748] font-semibold text-sm hover:bg-[#F9FAFB] transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-6 py-2.5 rounded-lg bg-[#C8102E] hover:bg-[#A00D24] text-white font-bold text-sm shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-              {isSaving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-              <Save className="w-4 h-4" />
-              {id ? 'Update Gallery Item' : 'Create Gallery Item'}
-            </button>
+            {videoSourceType === 'upload' ? (
+              <div>
+                <label className="block text-xs font-bold text-[#111827] mb-1">
+                  Upload Video File from Device
+                </label>
+                {videoUrl && !videoUrl.startsWith('http') ? (
+                  <div className="p-3 bg-white rounded-lg border border-[#E2E8F0] flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#111827] flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" /> Video Loaded from Device
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setVideoUrl(''); setDuration(''); }}
+                      className="text-xs text-[#C8102E] font-bold hover:underline"
+                    >
+                      Remove Video
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setVideoDragActive(true); }}
+                    onDragLeave={() => setVideoDragActive(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setVideoDragActive(false);
+                      if (e.dataTransfer.files?.[0]) handleVideoFileSelect(e.dataTransfer.files[0]);
+                    }}
+                    onClick={() => videoInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all ${
+                      videoDragActive
+                        ? 'border-[#C8102E] bg-rose-50/50'
+                        : 'border-[#E2E8F0] hover:border-[#C8102E] bg-white'
+                    }`}
+                  >
+                    <input
+                      ref={videoInputRef}
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) handleVideoFileSelect(e.target.files[0]);
+                      }}
+                    />
+                    <Video className="w-8 h-8 text-[#111827] mx-auto mb-1" />
+                    <p className="text-xs font-bold text-[#111827]">Click or drag to upload video file</p>
+                    <p className="text-[11px] text-[#718096]">MP4, WEBM formats (Duration is auto-calculated)</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-[#111827] mb-1">
+                  Video Stream URL (YouTube, Vimeo, MP4 link)
+                </label>
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={videoUrl}
+                    onChange={handleVideoUrlChange}
+                    placeholder="https://www.youtube.com/watch?v=... or direct MP4 link"
+                    className="w-full pl-9 pr-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+                  />
+                  <Link className="w-4 h-4 text-[#718096] absolute left-3 top-2.5" />
+                </div>
+                <p className="text-[10px] text-[#718096] mt-1">
+                  Duration will auto-calculate for direct video URLs (MP4, WEBM)
+                </p>
+              </div>
+            )}
+
+            {/* Auto Calculated Video Duration field */}
+            <div className="flex items-center gap-3 pt-2">
+              <div className="flex-1">
+                <label className="block text-xs font-bold text-[#111827] mb-1 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#C8102E]" /> Video Duration
+                  <span className="font-normal text-[#718096]">(Auto-calculated or enter manually)</span>
+                </label>
+                <input
+                  type="text"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                  placeholder="e.g. 02:45"
+                  className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#111827] bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+                />
+              </div>
+            </div>
           </div>
-        </form>
-      </div>
-    </RoleGuard>
+        )}
+
+        {/* Location & Sort Order */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-[#111827] mb-1">Location</label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Makkah, Saudi Arabia"
+              className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[#111827] mb-1">Sort Order (Ordering Index)</label>
+            <input
+              type="number"
+              min={1}
+              value={sortOrder}
+              onChange={(e) => setSortOrder(Number(e.target.value))}
+              className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+            />
+          </div>
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-xs font-bold text-[#111827] mb-1">Description</label>
+          <textarea
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Short descriptive caption for website visitors..."
+            className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+          />
+        </div>
+
+        {/* Active / Inactive Toggle */}
+        <div className="flex items-center justify-between p-4 bg-[#F9FAFB] rounded-lg border border-[#E2E8F0]">
+          <div>
+            <span className="text-xs font-bold text-[#111827] block">Active Status</span>
+            <span className="text-[11px] text-[#718096]">When active, item is publicly visible in website gallery.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsActive(!isActive)}
+            className={`px-4 py-2 rounded-lg font-bold text-xs transition-colors ${
+              isActive ? 'bg-[#48BB78] text-white' : 'bg-[#FC8181] text-white'
+            }`}
+          >
+            {isActive ? 'Active' : 'Inactive'}
+          </button>
+        </div>
+
+        {/* Footer Form Buttons */}
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => navigate('/gallery')}
+            className="px-5 py-2.5 rounded-lg border border-[#E2E8F0] text-[#2D3748] font-semibold text-sm hover:bg-[#F9FAFB] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="px-6 py-2.5 rounded-lg bg-[#C8102E] hover:bg-[#A00D24] text-white font-bold text-sm shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            {isSaving && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            <Save className="w-4 h-4" />
+            {id ? 'Update Gallery Item' : 'Create Gallery Item'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 };

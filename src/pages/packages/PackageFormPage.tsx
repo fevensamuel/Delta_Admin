@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Package } from '../../types';
 import { getPackageApi, createPackageApi, updatePackageApi } from '../../api/packages';
 import { PackageForm } from '../../components/forms/PackageForm';
-import { RoleGuard } from '../../components/common/RoleGuard';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
 
@@ -70,22 +69,20 @@ export const PackageFormPage: React.FC = () => {
   }
 
   return (
-    <RoleGuard module="packages" action={id ? 'edit' : 'create'}>
-      <div className="space-y-6 animate-in fade-in">
-        <div>
-          <h2 className="text-xl font-extrabold text-[#1A1A2E]">
-            {id ? `Edit Package: ${packageToEdit?.titleEn}` : 'Create New Umrah / Hajj Package'}
-          </h2>
-          <p className="text-xs text-[#718096] mt-0.5">Fill in package details, multilingual titles, itinerary, and inclusions.</p>
-        </div>
-
-        <PackageForm
-          initialData={packageToEdit || undefined}
-          onSubmit={handleSubmit}
-          onCancel={() => navigate('/packages')}
-          isLoading={isSaving}
-        />
+    <div className="space-y-6 animate-in fade-in">
+      <div>
+        <h2 className="text-xl font-extrabold text-[#1A1A2E]">
+          {id ? `Edit Package: ${packageToEdit?.titleEn}` : 'Create New Umrah / Hajj Package'}
+        </h2>
+        <p className="text-xs text-[#718096] mt-0.5">Fill in package details, multilingual titles, itinerary, and inclusions.</p>
       </div>
-    </RoleGuard>
+
+      <PackageForm
+        initialData={packageToEdit || undefined}
+        onSubmit={handleSubmit}
+        onCancel={() => navigate('/packages')}
+        isLoading={isSaving}
+      />
+    </div>
   );
 };

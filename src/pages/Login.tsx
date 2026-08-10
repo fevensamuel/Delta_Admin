@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Compass, Lock, User as UserIcon, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Compass, Lock, User as UserIcon, AlertCircle, ArrowRight } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [username, setUsername] = useState('superadmin@deltatravel.com');
+  const [username, setUsername] = useState('admin@deltatravel.com');
   const [password, setPassword] = useState('admin123');
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,21 +28,15 @@ export const Login: React.FC = () => {
     }
   };
 
-  const setDemoAccount = (roleEmail: string) => {
-    setUsername(roleEmail);
-    setPassword('admin123');
-    setErrorMessage('');
-  };
-
   return (
     <div className="min-h-screen bg-[#111827] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Decorative Background Accents - Using brand colors */}
+      {/* Decorative Background Accents */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#C8102E]/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#C8102E]/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#C8102E]/[0.03] rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-md w-full relative z-10">
-        {/* Brand Identity - Using admin theme */}
+        {/* Brand Identity */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-[#C8102E] flex items-center justify-center text-white mx-auto shadow-xl shadow-[#C8102E]/30 mb-3 border border-[#FC8181]/30">
             <Compass className="w-9 h-9" />
@@ -77,7 +71,7 @@ export const Login: React.FC = () => {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="superadmin@deltatravel.com"
+                  placeholder="admin@deltatravel.com"
                   className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm text-[#111827] focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E] placeholder:text-[#A0AEC0]"
                 />
               </div>
@@ -126,36 +120,6 @@ export const Login: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Credentials Preset Bar */}
-          <div className="mt-8 pt-5 border-t border-[#E2E8F0]">
-            <p className="text-[11px] font-bold text-[#718096] uppercase tracking-wider mb-2.5 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#C8102E]" /> Evaluator Demo Presets:
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setDemoAccount('superadmin@deltatravel.com')}
-                className="p-2 rounded-xl bg-[#C8102E]/10 hover:bg-[#C8102E]/20 border border-[#C8102E]/30 text-[11px] font-semibold text-[#C8102E] text-center transition-colors"
-              >
-                SuperAdmin
-              </button>
-              <button
-                type="button"
-                onClick={() => setDemoAccount('admin@deltatravel.com')}
-                className="p-2 rounded-xl bg-[#C8102E]/10 hover:bg-[#C8102E]/20 border border-[#C8102E]/30 text-[11px] font-semibold text-[#C8102E] text-center transition-colors"
-              >
-                Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => setDemoAccount('editor@deltatravel.com')}
-                className="p-2 rounded-xl bg-[#C8102E]/10 hover:bg-[#C8102E]/20 border border-[#C8102E]/30 text-[11px] font-semibold text-[#C8102E] text-center transition-colors"
-              >
-                Editor
-              </button>
-            </div>
-          </div>
         </div>
 
         <p className="text-center text-xs text-[#718096] mt-6 font-medium">

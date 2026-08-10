@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole } from '../types';
+import { User } from '../types';
 import { loginApi } from '../api/auth';
 import { useToast } from './ToastContext';
 
@@ -10,8 +10,6 @@ interface AuthContextType {
   isLoading: boolean;
   login: (usernameOrEmail: string, password: string) => Promise<void>;
   logout: (message?: string) => void;
-  switchRoleForDemo: (newRole: UserRole) => void;
-  hasPermission: (module: string, action?: 'view' | 'create' | 'edit' | 'delete' | 'send' | 'import') => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,7 +21,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { showToast } = useToast();
 
   useEffect(() => {
-    // Restore auth state from localStorage on load
     const savedToken = localStorage.getItem('admin_token') || localStorage.getItem('token');
     const savedUser = localStorage.getItem('admin_user') || localStorage.getItem('user');
 
@@ -50,7 +47,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('📤 Attempting login for:', usernameOrEmail);
       const res = await loginApi(usernameOrEmail, password);
       
-      // Check isActive status
       if (res.user && res.user.isActive === false) {
         throw new Error('Account is disabled. Contact administrator.');
       }
@@ -58,7 +54,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(res.token);
       setUser(res.user);
       
-      // Save to localStorage
       localStorage.setItem('admin_token', res.token);
       localStorage.setItem('admin_user', JSON.stringify(res.user));
       localStorage.setItem('token', res.token);
@@ -85,71 +80,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast('info', message || 'Logged out successfully');
   };
 
-  const switchRoleForDemo = (newRole: UserRole) => {
-    if (!user) return;
-    const updatedUser: User = { ...user, role: newRole };
-    setUser(updatedUser);
-    localStorage.setItem('admin_user', JSON.stringify(updatedUser));
-    showToast('info', `Switched active role to ${newRole} for demonstration`);
-  };
-
-  // ============================================================
-  // PERMISSION SYSTEM - SuperAdmin has FULL access to everything
-  // ============================================================
-  const hasPermission = (module: string, action: 'view' | 'create' | 'edit' | 'delete' | 'send' | 'import' = 'view'): boolean => {
-    if (!user) return false;
-    const role = user.role;
-
-    // ============================================================
-    // SUPERADMIN - FULL ACCESS TO EVERYTHING
-    // ============================================================
-    if (role === 'SuperAdmin') return true;
-
-    // ============================================================
-    // USER MANAGEMENT - ONLY SUPERADMIN
-    // ============================================================
-    if (module === 'users') {
-      return false;
-    }
-
-    // ============================================================
-    // ADMIN PERMISSIONS
-    // ============================================================
-    if (role === 'Admin') {
-      // Admins have access to everything except user management
-      return true;
-    }
-
-    // ============================================================
-    // EDITOR PERMISSIONS
-    // ============================================================
-    if (role === 'Editor') {
-      switch (module) {
-        case 'dashboard':
-        case 'visa':
-        case 'partners':
-        case 'leads':
-          return true;
-        case 'packages':
-        case 'gallery':
-          if (action === 'delete') return false;
-          return true; // view, create, edit allowed
-        case 'subscribers':
-          if (action === 'view') return true;
-          return false; // View only, no import/delete
-        case 'sms':
-          return false; // Editor cannot launch or access SMS broadcast module
-        case 'inquiries':
-          if (action === 'delete') return false;
-          return true; // view, update status allowed
-        default:
-          return false;
-      }
-    }
-
-    return false;
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -159,8 +89,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         logout,
-        switchRoleForDemo,
-        hasPermission
       }}
     >
       {children}
