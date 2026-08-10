@@ -30,13 +30,11 @@ export const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#111827] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Decorative Background Accents */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#C8102E]/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#C8102E]/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#C8102E]/[0.03] rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-md w-full relative z-10">
-        {/* Brand Identity */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-[#C8102E] flex items-center justify-center text-white mx-auto shadow-xl shadow-[#C8102E]/30 mb-3 border border-[#FC8181]/30">
             <Compass className="w-9 h-9" />
@@ -47,7 +45,6 @@ export const Login: React.FC = () => {
           </p>
         </div>
 
-        {/* Login Card */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 border border-[#E2E8F0] shadow-black/30">
           <div className="mb-6">
             <h2 className="text-xl font-bold text-[#111827]">Sign in to your account</h2>
