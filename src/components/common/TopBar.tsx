@@ -1,8 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { Menu, Shield, ChevronRight, Search, Bell } from 'lucide-react';
-import { UserRole } from '../../types';
+import { Menu, ChevronRight, Search, Bell } from 'lucide-react';
 
 interface TopBarProps {
   onToggleSidebar?: () => void;
@@ -10,7 +8,6 @@ interface TopBarProps {
 }
 
 export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar, onMenuClick }) => {
-  const { user, switchRoleForDemo } = useAuth();
   const location = useLocation();
 
   const handleToggle = onMenuClick || onToggleSidebar;
@@ -28,7 +25,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar, onMenuClick }) 
     if (path.startsWith('/sms')) return 'SMS Campaigns';
     if (path.startsWith('/inquiries')) return 'Customer Inquiries';
     if (path.startsWith('/leads')) return 'Booking Lead Analytics';
-    if (path.startsWith('/users')) return 'User & Role Management';
     return 'Admin Dashboard';
   };
 
@@ -53,7 +49,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar, onMenuClick }) 
         </div>
       </div>
 
-      {/* Right: Search, Role Switcher, Notifications */}
+      {/* Right: Search & Notifications */}
       <div className="flex items-center gap-4">
         {/* Search Bar */}
         <div className="relative hidden md:block">
@@ -63,26 +59,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar, onMenuClick }) 
             className="pl-9 pr-4 py-1.5 bg-white/10 border border-white/20 rounded-lg text-xs w-56 focus:ring-2 focus:ring-[#C8102E] focus:outline-none font-medium text-white placeholder-white/60"
           />
           <Search className="absolute left-3 top-2 text-white/60 w-3.5 h-3.5" />
-        </div>
-
-        {/* Role Quick Switcher */}
-        <div className="hidden sm:flex items-center gap-1.5 p-1 bg-[#1F2937] rounded-lg border border-white/10 text-xs">
-          <span className="text-gray-300 font-semibold px-1.5 flex items-center gap-1 text-[11px]">
-            <Shield className="w-3.5 h-3.5 text-[#C8102E]" /> Role:
-          </span>
-          {(['SuperAdmin', 'Admin', 'Editor'] as UserRole[]).map((r) => (
-            <button
-              key={r}
-              onClick={() => switchRoleForDemo(r)}
-              className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                user?.role === r
-                  ? 'bg-[#C8102E] text-white shadow-xs'
-                  : 'text-white/70 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              {r}
-            </button>
-          ))}
         </div>
 
         {/* Notification Bell */}

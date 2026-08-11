@@ -5,6 +5,7 @@ import { DashboardStats } from '../types';
 import { StatsCard } from '../components/common/StatsCard';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { useExchangeRateStore } from '../store/useExchangeRateStore';
+import { useAuth } from '../context/AuthContext';
 import {
   Package,
   Image as ImageIcon,
@@ -29,8 +30,26 @@ import {
   Bar
 } from 'recharts';
 
+// Helper function to get full image URL
+const getFullImageUrl = (path: string): string => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  if (path.startsWith('data:')) {
+    return path;
+  }
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const baseWithoutApi = baseUrl.replace(/\/api$/, '');
+  if (path.startsWith('/uploads')) {
+    return `${baseWithoutApi}${path}`;
+  }
+  return `${baseWithoutApi}${path}`;
+};
+
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { rate, lastUpdated, fetchRate, isLoading: isRateLoading } = useExchangeRateStore();
@@ -57,18 +76,26 @@ export const Dashboard: React.FC = () => {
     return <LoadingSpinner text="Loading Dashboard Analytics..." />;
   }
 
-  // Helper to check if item is a video
   const isVideo = (item: any): boolean => {
     return item.type === 'Video' || item.type === 'video';
   };
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300">
-      {/* Top Header */}
+      {/* Top Header with User Greeting */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold text-[#111827]">Travel Agency Dashboard</h2>
           <p className="text-xs text-[#718096] mt-0.5">Overview of website packages, WhatsApp leads, exchange rates, and gallery media.</p>
+        </div>
+        <div className="flex items-center gap-3 bg-white rounded-lg border border-[#E2E8F0] px-4 py-2 shadow-xs">
+          <div className="w-8 h-8 rounded-full bg-[#C8102E] flex items-center justify-center text-white font-bold text-xs">
+            {user?.username ? user.username.charAt(0).toUpperCase() : 'A'}
+          </div>
+          <div>
+            <p className="text-xs font-bold text-[#111827]">{user?.username || 'Admin'}</p>
+            <p className="text-[10px] text-[#C8102E] font-bold">Admin</p>
+          </div>
         </div>
       </div>
 
@@ -120,7 +147,6 @@ export const Dashboard: React.FC = () => {
 
       {/* Row 2: Exchange Rate Widget & Package Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Real-time Exchange Rate Service Widget (1 col) */}
         <section className="bg-white rounded-lg border border-[#E2E8F0] shadow-xs p-6 flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3 mb-4">
@@ -151,7 +177,6 @@ export const Dashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Quick Currency Converter */}
             <div className="mt-4 space-y-2">
               <label className="block text-xs font-bold text-[#111827]">Quick Price Converter</label>
               <div className="flex gap-2">
@@ -178,7 +203,6 @@ export const Dashboard: React.FC = () => {
           </div>
         </section>
 
-        {/* WhatsApp Clicks Performance Chart (2 cols) */}
         <section className="lg:col-span-2 bg-white rounded-lg border border-[#E2E8F0] shadow-xs p-6 flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -211,7 +235,6 @@ export const Dashboard: React.FC = () => {
 
       {/* Row 3: Recent Gallery Uploads & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Gallery Uploads (2 cols) */}
         <section className="lg:col-span-2 bg-white rounded-lg border border-[#E2E8F0] shadow-xs p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
             <div>
@@ -234,7 +257,7 @@ export const Dashboard: React.FC = () => {
                 <div key={g.id} className="p-3 rounded-lg border border-[#E2E8F0] bg-[#F9FAFB] flex items-center gap-3">
                   {g.imageUrl ? (
                     <img 
-                      src={g.imageUrl} 
+                      src={getFullImageUrl(g.imageUrl)} 
                       alt={g.titleEn} 
                       className="w-16 h-12 object-cover rounded-lg border shrink-0"
                     />
@@ -263,7 +286,6 @@ export const Dashboard: React.FC = () => {
           </div>
         </section>
 
-        {/* Quick Actions Panel (1 col) */}
         <section className="bg-white rounded-lg border border-[#E2E8F0] shadow-xs p-6 space-y-4 flex flex-col justify-between">
           <div>
             <h3 className="font-bold text-base text-[#111827] border-b border-[#E2E8F0] pb-3 mb-4">

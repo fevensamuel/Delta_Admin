@@ -37,9 +37,10 @@ export const PackageForm: React.FC<PackageFormProps> = ({
   
   // Auto-calculated USD Price
   const priceUsdDisplay = rate > 0 ? priceEtb / rate : 0;
+  const priceSarDisplay = priceUsdDisplay * 3.75;
   const [durationDays, setDurationDays] = useState<number>(initialData?.durationDays || 7);
   
-  // Image state & mode
+  // Image state & mode - FIXED: Store existing image URL
   const [imageUrl, setImageUrl] = useState(
     initialData?.imageUrl || ''
   );
@@ -231,7 +232,8 @@ export const PackageForm: React.FC<PackageFormProps> = ({
       errors.durationDays = 'Duration must be at least 1 day. Please enter a valid number of days.';
     }
     
-    if (!imageUrl && !selectedImageFile) {
+    // FIX: Only require image if there's no existing image and no new file selected
+    if (!imageUrl && !selectedImageFile && !initialData?.imageUrl) {
       errors.imageUrl = 'Image is required. Please upload an image for the package.';
     }
 
@@ -251,6 +253,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
       formData.append('titleAm', titleAm.trim() || '');
       formData.append('category', category);
       formData.append('priceUsd', String(priceUsdDisplay));
+      formData.append('priceSar', String(priceSarDisplay));
       formData.append('durationDays', String(durationDays));
       formData.append('departureCity', 'Addis Ababa');
       formData.append('inclusions', JSON.stringify(inclusions));
@@ -259,12 +262,16 @@ export const PackageForm: React.FC<PackageFormProps> = ({
       formData.append('status', status);
       formData.append('isActive', String(status === 'Active'));
 
-      // Append image file if selected
+      // FIX: Handle image properly - preserve existing if no new file
       if (selectedImageFile) {
+        // New file uploaded
         formData.append('packageImage', selectedImageFile);
-      } else if (imageUrl) {
-        // If using URL, send as imageUrl
+      } else if (imageUrl && imageUrl.startsWith('http')) {
+        // Existing URL image (keep it)
         formData.append('imageUrl', imageUrl);
+      } else if (initialData?.imageUrl) {
+        // Preserve existing image URL from initial data
+        formData.append('imageUrl', initialData.imageUrl);
       }
 
       console.log('📤 PackageForm - Submitting FormData');
@@ -431,6 +438,25 @@ export const PackageForm: React.FC<PackageFormProps> = ({
             </p>
           </div>
 
+          {/* Price (SAR) - Auto-calculated */}
+          <div>
+            <label className="block text-xs font-bold text-[#111827] mb-1">
+              Price (SAR) - Auto-calculated
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                readOnly
+                disabled
+                value={priceSarDisplay ? `${priceSarDisplay.toFixed(2)} SAR` : 'Auto-calculated'}
+                className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm font-bold text-[#111827] cursor-not-allowed opacity-80"
+              />
+            </div>
+            <p className="text-[10px] text-emerald-600 font-medium mt-1">
+              Auto-calculated based on USD price (1 USD ≈ 3.75 SAR)
+            </p>
+          </div>
+
           {/* Duration (Days) - CLEARABLE WITH VALIDATION */}
           <div>
             <label className="block text-xs font-bold text-[#111827] mb-1">Duration (Days) *</label>
@@ -504,7 +530,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="block text-xs font-bold text-[#111827]">
-              Package Image *
+              Package Image
             </label>
             <div className="flex items-center gap-2">
               <button

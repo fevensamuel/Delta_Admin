@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GalleryItem } from '../../types';
 import { getGalleryItems, deleteGalleryItem, updateGalleryItem } from '../../api/gallery';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
-import { Plus, Upload, Search, Filter, MapPin, Calendar, Edit, Trash2, Video, Image as ImageIcon, Play, X, ExternalLink, Maximize2, Minimize2 } from 'lucide-react';
+import { Plus, Upload, Search, Filter, MapPin, Calendar, Edit, Trash2, Video, Image as ImageIcon, Play, X, Maximize2, Minimize2 } from 'lucide-react';
 
 // Helper to ensure array
 const ensureArray = <T,>(data: any): T[] => {
@@ -19,7 +19,7 @@ const ensureArray = <T,>(data: any): T[] => {
   return [];
 };
 
-// Helper to normalize type (handle both 'photo' and 'Photo')
+// Helper to normalize type
 const normalizeType = (type: string): string => {
   if (!type) return 'Photo';
   const lower = type.toLowerCase();
@@ -27,58 +27,59 @@ const normalizeType = (type: string): string => {
   return 'Photo';
 };
 
-// Helper to get full image URL - FIXED
+// Helper to get full image URL
 const getFullImageUrl = (imageUrl: string): string => {
   if (!imageUrl) return '';
-  
-  // If it's already a full URL with http, return it
   if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
     return imageUrl;
   }
-  
-  // If it's a data URI, return as is
   if (imageUrl.startsWith('data:')) {
     return imageUrl;
   }
-  
-  // Get the base URL from environment
   const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
   const baseWithoutApi = baseUrl.replace(/\/api$/, '');
-  
-  // If it starts with /uploads, prepend the base URL
   if (imageUrl.startsWith('/uploads')) {
     return `${baseWithoutApi}${imageUrl}`;
   }
-  
-  // Otherwise, assume it's a filename in /uploads/images/
   return `${baseWithoutApi}/uploads/images/${imageUrl}`;
 };
 
-// Helper to get full video URL - FIXED
+// Helper to get full video URL
 const getFullVideoUrl = (videoUrl: string): string => {
   if (!videoUrl) return '';
-  
-  // If it's already a full URL with http, return it
   if (videoUrl.startsWith('http://') || videoUrl.startsWith('https://')) {
     return videoUrl;
   }
-  
-  // If it's a YouTube URL
   if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
     return videoUrl;
   }
-  
-  // Get the base URL from environment
   const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
   const baseWithoutApi = baseUrl.replace(/\/api$/, '');
-  
-  // If it starts with /uploads, prepend the base URL
   if (videoUrl.startsWith('/uploads')) {
     return `${baseWithoutApi}${videoUrl}`;
   }
-  
-  // Otherwise, assume it's a filename in /uploads/videos/
   return `${baseWithoutApi}/uploads/videos/${videoUrl}`;
+};
+
+// Check if URL is a YouTube URL
+const isYouTubeUrl = (url?: string): boolean => {
+  if (!url) return false;
+  return url.includes('youtube.com') || url.includes('youtu.be');
+};
+
+// Extract YouTube video ID
+const getYouTubeId = (url?: string): string | null => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
+
+// Get YouTube embed URL
+const getYouTubeEmbedUrl = (url?: string): string | null => {
+  const videoId = getYouTubeId(url);
+  if (!videoId) return null;
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
 };
 
 export const GalleryGrid: React.FC = () => {
@@ -87,6 +88,8 @@ export const GalleryGrid: React.FC = () => {
 
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [videoThumbnails, setVideoThumbnails] = useState<Record<string, string>>({});
+  const [processingThumbnails, setProcessingThumbnails] = useState<Set<string>>(new Set());
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -97,14 +100,14 @@ export const GalleryGrid: React.FC = () => {
   const [activeVideoItem, setActiveVideoItem] = useState<GalleryItem | null>(null);
   const [activeImageItem, setActiveImageItem] = useState<GalleryItem | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Delete modal
   const [itemToDelete, setItemToDelete] = useState<GalleryItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Video ref for generating thumbnails
-  const videoRef = useRef<HTMLVideoElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
     loadGallery();
@@ -122,14 +125,20 @@ export const GalleryGrid: React.FC = () => {
     return () => window.removeEventListener('keydown', handleEsc);
   }, []);
 
+  // Clean up observer on unmount
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, []);
+
   const loadGallery = async () => {
     setIsLoading(true);
     try {
       const data = await getGalleryItems();
       const galleryArray = ensureArray<GalleryItem>(data);
-      
-      // Log raw data to see what's coming from the API
-      console.log('📸 Raw gallery data:', galleryArray);
       
       const normalizedItems = galleryArray.map(item => ({
         ...item,
@@ -141,17 +150,12 @@ export const GalleryGrid: React.FC = () => {
         uploadDate: item.uploadDate || new Date().toISOString().substring(0, 10)
       }));
       
-      // Log normalized items with full URLs
-      normalizedItems.forEach(item => {
-        if (item.type === 'Video') {
-          console.log(`🎬 Video: ${item.titleEn} -> ${getFullVideoUrl(item.videoUrl)}`);
-        } else {
-          console.log(`🖼️ Photo: ${item.titleEn} -> ${getFullImageUrl(item.imageUrl)}`);
-        }
-      });
-      
       setItems(normalizedItems);
       console.log('✅ Gallery loaded:', normalizedItems.length, 'items');
+      
+      // Reset thumbnails when items change
+      setVideoThumbnails({});
+      setProcessingThumbnails(new Set());
     } catch (error) {
       console.error('❌ Error loading gallery:', error);
       showToast('error', 'Failed to load gallery items');
@@ -187,6 +191,163 @@ export const GalleryGrid: React.FC = () => {
     }
   };
 
+  // Generate video thumbnail at a specific time - ONLY for thumbnails, NOT playback
+  const generateThumbnail = useCallback((videoUrl: string, time: number = 1): Promise<string> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      const urlWithCache = videoUrl + (videoUrl.includes('?') ? '&' : '?') + `_t=${Date.now()}`;
+      video.src = urlWithCache;
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      video.preload = 'metadata';
+
+      const cleanup = () => {
+        video.remove();
+      };
+
+      const onSuccess = () => {
+        try {
+          video.currentTime = time;
+          video.addEventListener('seeked', () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = 320;
+              canvas.height = 180;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
+                cleanup();
+                resolve(thumbnail);
+              } else {
+                cleanup();
+                resolve('');
+              }
+            } catch (e) {
+              cleanup();
+              resolve('');
+            }
+          }, { once: true });
+        } catch (e) {
+          cleanup();
+          resolve('');
+        }
+      };
+
+      const onError = () => {
+        cleanup();
+        resolve('');
+      };
+
+      video.addEventListener('canplay', onSuccess, { once: true });
+      video.addEventListener('error', onError, { once: true });
+      video.load();
+    });
+  }, []);
+
+  // Process thumbnails for visible videos only
+  const processVisibleThumbnails = useCallback(async (visibleItems: GalleryItem[]) => {
+    const videoItems = visibleItems.filter(
+      item => item.type === 'Video' && item.videoUrl && !videoThumbnails[item.id] && !processingThumbnails.has(item.id)
+    );
+
+    if (videoItems.length === 0) return;
+
+    // Process one at a time to avoid overwhelming the browser
+    for (const item of videoItems) {
+      setProcessingThumbnails(prev => new Set(prev).add(item.id));
+      
+      try {
+        const fullUrl = getFullVideoUrl(item.videoUrl);
+        // For YouTube videos, use YouTube thumbnail API instead of generating
+        if (isYouTubeUrl(fullUrl)) {
+          const youtubeId = getYouTubeId(fullUrl);
+          if (youtubeId) {
+            setVideoThumbnails(prev => ({
+              ...prev,
+              [item.id]: `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`
+            }));
+          }
+        } else {
+          const thumbnail = await generateThumbnail(fullUrl);
+          if (thumbnail) {
+            setVideoThumbnails(prev => ({
+              ...prev,
+              [item.id]: thumbnail
+            }));
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to generate thumbnail for ${item.id}:`, error);
+      } finally {
+        setProcessingThumbnails(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(item.id);
+          return newSet;
+        });
+      }
+    }
+  }, [videoThumbnails, processingThumbnails, generateThumbnail]);
+
+  // IntersectionObserver for lazy loading thumbnails
+  useEffect(() => {
+    if (items.length === 0) return;
+
+    // Clean up old observer
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    // Find video elements that need thumbnails
+    const videoContainers = document.querySelectorAll('[data-video-id]');
+    const visibleItems: GalleryItem[] = [];
+
+    videoContainers.forEach(container => {
+      const videoId = container.getAttribute('data-video-id');
+      const item = items.find(i => String(i.id) === videoId);
+      if (item && item.type === 'Video' && item.videoUrl && !videoThumbnails[item.id]) {
+        visibleItems.push(item);
+      }
+    });
+
+    if (visibleItems.length > 0) {
+      processVisibleThumbnails(visibleItems);
+    }
+
+    // Set up observer for future visibility
+    observerRef.current = new IntersectionObserver((entries) => {
+      const newVisibleItems: GalleryItem[] = [];
+      
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const videoId = (entry.target as HTMLElement).getAttribute('data-video-id');
+          const item = items.find(i => String(i.id) === videoId);
+          if (item && item.type === 'Video' && item.videoUrl && !videoThumbnails[item.id]) {
+            newVisibleItems.push(item);
+          }
+        }
+      });
+
+      if (newVisibleItems.length > 0) {
+        processVisibleThumbnails(newVisibleItems);
+      }
+    }, {
+      rootMargin: '200px',
+      threshold: 0.01
+    });
+
+    videoContainers.forEach(container => {
+      observerRef.current?.observe(container);
+    });
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [items, videoThumbnails, processVisibleThumbnails]);
+
   const itemsArray = ensureArray<GalleryItem>(items);
 
   const filteredItems = itemsArray.filter((item) => {
@@ -199,89 +360,6 @@ export const GalleryGrid: React.FC = () => {
                           (statusFilter === 'Inactive' && !item.isActive);
     return matchesSearch && matchesType && matchesStatus;
   });
-
-  // Check if URL is a YouTube URL
-  const isYouTubeUrl = (url?: string): boolean => {
-    if (!url) return false;
-    return url.includes('youtube.com') || url.includes('youtu.be');
-  };
-
-  // Extract YouTube video ID
-  const getYouTubeId = (url?: string): string | null => {
-    if (!url) return null;
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-  };
-
-  // Get YouTube embed URL
-  const getYouTubeEmbedUrl = (url?: string): string | null => {
-    const videoId = getYouTubeId(url);
-    if (!videoId) return null;
-    return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
-  };
-
-  // Generate video thumbnail from video element
-  const generateVideoThumbnail = (videoUrl: string): Promise<string> => {
-    return new Promise((resolve) => {
-      const video = document.createElement('video');
-      video.src = videoUrl;
-      video.crossOrigin = 'anonymous';
-      video.muted = true;
-      video.currentTime = 1;
-      
-      video.addEventListener('loadeddata', () => {
-        video.currentTime = 1;
-      });
-      
-      video.addEventListener('seeked', () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = 320;
-          canvas.height = 180;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const thumbnail = canvas.toDataURL('image/jpeg');
-            resolve(thumbnail);
-          } else {
-            resolve('');
-          }
-        } catch (e) {
-          resolve('');
-        }
-      });
-      
-      video.addEventListener('error', () => {
-        resolve('');
-      });
-      
-      video.load();
-    });
-  };
-
-  const [videoThumbnails, setVideoThumbnails] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const generateThumbnails = async () => {
-      const thumbnails: Record<string, string> = {};
-      for (const item of itemsArray) {
-        if (item.type === 'Video' && item.videoUrl && !thumbnails[item.id]) {
-          const fullUrl = getFullVideoUrl(item.videoUrl);
-          console.log(`🎬 Generating thumbnail for: ${fullUrl}`);
-          const thumbnail = await generateVideoThumbnail(fullUrl);
-          if (thumbnail) {
-            thumbnails[item.id] = thumbnail;
-          }
-        }
-      }
-      setVideoThumbnails(thumbnails);
-    };
-    
-    if (itemsArray.length > 0) {
-      generateThumbnails();
-    }
-  }, [itemsArray]);
 
   if (isLoading) {
     return <LoadingSpinner text="Loading Website Media Gallery..." />;
@@ -372,10 +450,12 @@ export const GalleryGrid: React.FC = () => {
             const fullVideoUrl = getFullVideoUrl(item.videoUrl);
             const isYouTube = isVideo && isYouTubeUrl(item.videoUrl);
             const thumbnail = videoThumbnails[item.id] || '';
+            const isProcessing = processingThumbnails.has(item.id);
             
             return (
               <div
                 key={item.id}
+                data-video-id={isVideo ? item.id : undefined}
                 className="bg-white rounded-lg border border-[#E2E8F0] overflow-hidden shadow-xs hover:shadow-md transition-all group flex flex-col justify-between"
               >
                 <div
@@ -389,54 +469,41 @@ export const GalleryGrid: React.FC = () => {
                   }}
                 >
                   {isVideo ? (
-                    <div className="w-full h-full bg-[#111827] flex items-center justify-center">
-                      {fullVideoUrl ? (
-                        isYouTube ? (
-                          <div className="w-full h-full relative">
-                            <img
-                              src={`https://img.youtube.com/vi/${getYouTubeId(item.videoUrl)}/mqdefault.jpg`}
-                              alt={item.titleEn}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/20 transition-all">
-                              <div className="w-12 h-12 rounded-full bg-[#C8102E] text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                <Play className="w-6 h-6 fill-current ml-0.5" />
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-full h-full relative bg-[#111827] flex items-center justify-center">
-                            {thumbnail ? (
-                              <img
-                                src={thumbnail}
-                                alt={item.titleEn}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <video
-                                src={fullVideoUrl}
-                                className="w-full h-full object-cover"
-                                muted
-                                playsInline
-                                poster={thumbnail || undefined}
-                                onError={(e) => {
-                                  const videoEl = e.target as HTMLVideoElement;
-                                  videoEl.style.display = 'none';
-                                }}
-                              />
-                            )}
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/20 transition-all pointer-events-none">
-                              <div className="w-12 h-12 rounded-full bg-[#C8102E] text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                <Play className="w-6 h-6 fill-current ml-0.5" />
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      ) : (
-                        <div className="text-white text-center">
-                          <Video className="w-12 h-12 mx-auto text-[#C8102E] opacity-50" />
-                          <p className="text-xs mt-2 text-gray-400">No preview available</p>
+                    <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] to-[#2d2d44] flex items-center justify-center relative">
+                      {thumbnail ? (
+                        <img
+                          src={thumbnail}
+                          alt={item.titleEn}
+                          className="w-full h-full object-cover transition-opacity duration-300"
+                          loading="lazy"
+                        />
+                      ) : isProcessing ? (
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="w-8 h-8 border-3 border-[#C8102E] border-t-transparent rounded-full animate-spin"></div>
+                          <p className="text-[10px] text-gray-400 mt-2">Loading preview...</p>
                         </div>
+                      ) : isYouTube ? (
+                        <img
+                          src={`https://img.youtube.com/vi/${getYouTubeId(item.videoUrl)}/mqdefault.jpg`}
+                          alt={item.titleEn}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="text-center">
+                          <Video className="w-12 h-12 mx-auto text-[#C8102E] opacity-60" />
+                          <p className="text-xs text-gray-400 mt-2">Video</p>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/20 transition-all">
+                        <div className="w-14 h-14 rounded-full bg-[#C8102E] text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                          <Play className="w-7 h-7 fill-current ml-1" />
+                        </div>
+                      </div>
+                      {item.duration && (
+                        <span className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 text-white text-[10px] font-bold rounded">
+                          {item.duration}
+                        </span>
                       )}
                     </div>
                   ) : (
@@ -444,8 +511,8 @@ export const GalleryGrid: React.FC = () => {
                       src={fullImageUrl}
                       alt={item.titleEn}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
                       onError={(e) => {
-                        // Hide image on error - no placeholder
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
@@ -542,7 +609,7 @@ export const GalleryGrid: React.FC = () => {
         )}
       </div>
 
-      {/* Video Player Modal */}
+      {/* Video Player Modal - FIXED with proper controls and audio */}
       {activeVideoItem && (
         <div 
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
@@ -590,7 +657,7 @@ export const GalleryGrid: React.FC = () => {
             </div>
 
             <div className="p-4 bg-black flex justify-center items-center">
-              <div className="w-full aspect-video max-h-[75vh]">
+              <div className="w-full aspect-video max-h-[75vh] relative bg-black rounded-lg overflow-hidden">
                 {activeVideoItem.videoUrl && isYouTubeUrl(activeVideoItem.videoUrl) ? (
                   <iframe
                     src={getYouTubeEmbedUrl(activeVideoItem.videoUrl)!}
@@ -601,16 +668,14 @@ export const GalleryGrid: React.FC = () => {
                   />
                 ) : activeVideoItem.videoUrl ? (
                   <video
+                    key={activeVideoItem.id}
+                    ref={videoRef}
                     src={getFullVideoUrl(activeVideoItem.videoUrl)}
                     controls
                     autoPlay
                     className="w-full h-full rounded-lg shadow-lg object-contain bg-black"
                     controlsList="nodownload"
                     playsInline
-                    onError={(e) => {
-                      const videoEl = e.target as HTMLVideoElement;
-                      videoEl.style.display = 'none';
-                    }}
                   />
                 ) : (
                   <div className="w-full h-full bg-[#1A1A2E] flex items-center justify-center text-gray-500 rounded-lg">
@@ -680,7 +745,6 @@ export const GalleryGrid: React.FC = () => {
                   alt={activeImageItem.titleEn}
                   className="max-h-[70vh] w-auto object-contain rounded-lg border border-white/10 shadow-lg"
                   onError={(e) => {
-                    // Hide on error
                     (e.target as HTMLImageElement).style.display = 'none';
                   }}
                 />

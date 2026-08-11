@@ -11,6 +11,23 @@ import { useDebounce } from '../../hooks/useDebounce';
 import { Plus, Search, Filter, Edit, Trash2, Archive, MessageSquare, Package as PackageIcon, Users } from 'lucide-react';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
 
+// Helper function to get full image URL
+const getFullImageUrl = (path: string): string => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  if (path.startsWith('data:')) {
+    return path;
+  }
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const baseWithoutApi = baseUrl.replace(/\/api$/, '');
+  if (path.startsWith('/uploads')) {
+    return `${baseWithoutApi}${path}`;
+  }
+  return `${baseWithoutApi}/uploads/packages/${path}`;
+};
+
 export const PackageList: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -20,18 +37,15 @@ export const PackageList: React.FC = () => {
   const [packages, setPackages] = useState<Package[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Filters & Search with Debounce
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 400);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [sortBy, setSortBy] = useState<'priceEtb' | 'duration' | 'clicks'>('clicks');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Delete/Archive modal
   const [selectedPackageForDelete, setSelectedPackageForDelete] = useState<Package | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -44,7 +58,6 @@ export const PackageList: React.FC = () => {
     setIsLoading(true);
     try {
       const data = await getPackagesApi();
-      // Ensure data is an array
       const packageArray = Array.isArray(data) ? data : [];
       setPackages(packageArray);
       console.log('✅ Packages loaded:', packageArray.length);
@@ -59,7 +72,6 @@ export const PackageList: React.FC = () => {
 
   const handleArchive = async (pkg: Package) => {
     try {
-      // Toggle between Archived and Active
       const newStatus = pkg.status === 'Archived' ? 'Active' : 'Archived';
       const newIsActive = pkg.status === 'Archived' ? true : false;
       await updatePackageApi(pkg.id, { 
@@ -88,28 +100,19 @@ export const PackageList: React.FC = () => {
     }
   };
 
-  // Get the array of packages, ensuring it's always an array
   const packagesArray = Array.isArray(packages) ? packages : [];
 
-  // Filter & Search Logic - show ALL packages (Active, Archived, Inactive)
   const filteredPackages = packagesArray
     .filter((pkg) => {
       const query = debouncedSearchTerm.toLowerCase();
-      
-      // Handle undefined titleEn - use empty string as fallback
       const titleEn = pkg.titleEn || '';
       const titleAr = pkg.titleAr || '';
       const titleAm = pkg.titleAm || '';
-      
       const matchesSearch = 
         titleEn.toLowerCase().includes(query) ||
         titleAr.includes(query) ||
         titleAm.includes(query);
-      
-      // Check if selectedCategory is 'All' or matches the package category
       const matchesCategory = selectedCategory === 'All' || pkg.category === selectedCategory;
-      
-      // Show ALL packages regardless of status
       return matchesSearch && matchesCategory;
     })
     .sort((a, b) => {
@@ -128,7 +131,6 @@ export const PackageList: React.FC = () => {
       return sortOrder === 'desc' ? valB - valA : valA - valB;
     });
 
-  // Pagination calculation
   const totalPages = Math.ceil(filteredPackages.length / pageSize) || 1;
   const paginatedPackages = filteredPackages.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -141,7 +143,6 @@ export const PackageList: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in">
-      {/* Top Header & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold text-[#111827]">Umrah & Hajj Package Manager</h2>
@@ -156,7 +157,6 @@ export const PackageList: React.FC = () => {
         </button>
       </div>
 
-      {/* Navigation Tabs */}
       <div className="flex border-b border-slate-200">
         <button
           onClick={() => setActiveTab('catalog')}
@@ -184,10 +184,8 @@ export const PackageList: React.FC = () => {
         <PackagePersonsTable />
       ) : (
         <>
-          {/* Filter & Search Toolbar */}
           <div className="bg-white p-4 rounded-lg border border-[#E2E8F0] shadow-xs flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
-              {/* Search Input with Debouncing */}
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="w-4 h-4 text-[#718096] absolute left-3.5 top-3" />
                 <input
@@ -202,7 +200,6 @@ export const PackageList: React.FC = () => {
                 />
               </div>
 
-              {/* Category Filter */}
               <div className="flex items-center gap-1.5">
                 <Filter className="w-4 h-4 text-[#718096]" />
                 <select
@@ -222,7 +219,6 @@ export const PackageList: React.FC = () => {
               </div>
             </div>
 
-            {/* Sort & Page Size Controls */}
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1 text-xs">
                 <span className="text-[#718096] font-medium">Sort by:</span>
@@ -260,7 +256,6 @@ export const PackageList: React.FC = () => {
             </div>
           </div>
 
-          {/* Packages Table View */}
           <div className="bg-white rounded-lg border border-[#E2E8F0] shadow-xs overflow-hidden">
             {isLoading ? (
               <PackageSkeleton />
@@ -274,6 +269,7 @@ export const PackageList: React.FC = () => {
                         <th className="p-3.5">Category</th>
                         <th className="p-3.5">Price (ETB) <span className="text-[10px] text-emerald-600 font-bold">(Primary)</span></th>
                         <th className="p-3.5">Price (USD) <span className="text-[10px] text-[#718096] font-normal">(Auto)</span></th>
+                        <th className="p-3.5">Price (SAR) <span className="text-[10px] text-[#718096] font-normal">(Auto)</span></th>
                         <th className="p-3.5">Duration</th>
                         <th className="p-3.5">WhatsApp Clicks</th>
                         <th className="p-3.5">Status</th>
@@ -283,13 +279,12 @@ export const PackageList: React.FC = () => {
                     <tbody className="divide-y divide-[#E2E8F0] font-medium text-[#2D3748]">
                       {paginatedPackages.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="p-8 text-center text-[#718096]">
+                          <td colSpan={9} className="p-8 text-center text-[#718096]">
                             {packagesArray.length === 0 ? 'No packages found. Create your first package!' : 'No packages match the current search or filter criteria.'}
                           </td>
                         </tr>
                       ) : (
                         paginatedPackages.map((pkg) => {
-                          // Handle undefined values with fallbacks
                           const titleEn = pkg.titleEn || 'Untitled Package';
                           const category = pkg.category || 'Uncategorized';
                           const status = pkg.status || (pkg.isActive ? 'Active' : 'Inactive');
@@ -298,26 +293,25 @@ export const PackageList: React.FC = () => {
                           const priceUsdVal = pkg.priceUsd || pkg.price || 0;
                           const priceEtbVal = pkg.priceEtb || Math.round(priceUsdVal * rate);
                           const autoUsdVal = rate > 0 ? (priceEtbVal / rate).toFixed(2) : priceUsdVal.toFixed(2);
+                          const priceSarVal = Math.round(priceUsdVal * 3.75);
 
                           return (
                             <tr key={pkg.id} className="hover:bg-[#F9FAFB] transition-colors">
-                              {/* Image + Title */}
                               <td className="p-3.5 pl-5">
                                 <div className="flex items-center gap-3">
                                   {pkg.imageUrl ? (
                                     <img
-                                      src={pkg.imageUrl}
+                                      src={getFullImageUrl(pkg.imageUrl)}
                                       alt={titleEn}
                                       loading="lazy"
                                       className="w-14 h-11 object-cover rounded-lg border border-[#E2E8F0] shrink-0 bg-slate-100"
                                       onError={(e) => {
-                                        // Hide broken images
                                         (e.target as HTMLImageElement).style.display = 'none';
                                       }}
                                     />
                                   ) : (
                                     <div className="w-14 h-11 flex items-center justify-center bg-slate-100 rounded-lg border border-[#E2E8F0] shrink-0">
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                                         <circle cx="8.5" cy="8.5" r="1.5"/>
                                         <polyline points="21 15 16 10 5 21"/>
@@ -331,7 +325,6 @@ export const PackageList: React.FC = () => {
                                 </div>
                               </td>
 
-                              {/* Category Badge */}
                               <td className="p-3.5">
                                 <span
                                   className={`px-2.5 py-1 rounded-full font-bold text-[11px] text-white ${
@@ -344,22 +337,22 @@ export const PackageList: React.FC = () => {
                                 </span>
                               </td>
 
-                              {/* Price ETB Primary */}
                               <td className="p-3.5 font-bold text-[#2D7D6B] text-sm">
                                 {priceEtbVal.toLocaleString()} ETB
                               </td>
 
-                              {/* Price USD Auto-calculated */}
                               <td className="p-3.5 font-semibold text-[#718096] text-xs">
                                 ${autoUsdVal}
                               </td>
 
-                              {/* Duration */}
+                              <td className="p-3.5 font-semibold text-[#718096] text-xs">
+                                {priceSarVal.toLocaleString()} SAR
+                              </td>
+
                               <td className="p-3.5 text-[#2D3748]">
                                 {pkg.durationDays || 0} Days
                               </td>
 
-                              {/* WhatsApp Clicks Column */}
                               <td className="p-3.5">
                                 <div className="inline-flex items-center gap-1.5 font-bold text-[#2D7D6B] bg-[#2D7D6B]/10 px-3 py-1 rounded-lg border border-[#2D7D6B]/20">
                                   <MessageSquare className="w-3.5 h-3.5 text-[#2D7D6B]" />
@@ -367,7 +360,6 @@ export const PackageList: React.FC = () => {
                                 </div>
                               </td>
 
-                              {/* Status */}
                               <td className="p-3.5">
                                 <span
                                   className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white ${
@@ -380,7 +372,6 @@ export const PackageList: React.FC = () => {
                                 </span>
                               </td>
 
-                              {/* Actions */}
                               <td className="p-3.5 pr-5 text-right">
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
@@ -416,7 +407,6 @@ export const PackageList: React.FC = () => {
                   </table>
                 </div>
 
-                {/* Pagination Bar */}
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
@@ -430,7 +420,6 @@ export const PackageList: React.FC = () => {
         </>
       )}
 
-      {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={!!selectedPackageForDelete}
         title="Delete Package Permanently?"

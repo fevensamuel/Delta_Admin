@@ -61,14 +61,18 @@ export async function createPackageApi(data: FormData): Promise<Package> {
   }
 }
 
-// Update package with FormData (for file upload)
-export async function updatePackageApi(id: string, data: FormData): Promise<Package> {
+// Update package - FIXED: Handle both FormData and JSON, preserve image
+export async function updatePackageApi(id: string, data: FormData | Partial<Package>): Promise<Package> {
   try {
-    console.log('📤 updatePackageApi - FormData:', { id });
+    const isFormData = data instanceof FormData;
     
-    const res = await apiClient.put(`/admin/packages/${id}`, data, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    console.log(`📤 updatePackageApi - ${isFormData ? 'FormData' : 'JSON'}:`, { id });
+    
+    const config = isFormData 
+      ? { headers: { 'Content-Type': 'multipart/form-data' } } 
+      : {};
+
+    const res = await apiClient.put(`/admin/packages/${id}`, data, config);
     const updatedPkg = res.data?.data || res.data;
     console.log('✅ Package updated via API:', updatedPkg);
     return updatedPkg;
