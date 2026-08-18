@@ -41,7 +41,10 @@ apiClient.interceptors.response.use(
 
 // Helper function to ensure data is always an array
 export const ensureArray = <T,>(data: any): T[] => {
+  // If it's already an array, return it
   if (Array.isArray(data)) return data;
+  
+  // If it's an object with a data property that's an array
   if (data && typeof data === 'object') {
     if (Array.isArray(data.data)) return data.data;
     if (Array.isArray(data.results)) return data.results;
@@ -51,6 +54,7 @@ export const ensureArray = <T,>(data: any): T[] => {
     if (Array.isArray(data.subscribers)) return data.subscribers;
     if (Array.isArray(data.gallery)) return data.gallery;
   }
+  
   return [];
 };
 

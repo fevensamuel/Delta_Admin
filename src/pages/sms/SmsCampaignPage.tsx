@@ -74,7 +74,8 @@ export const SmsCampaignPage: React.FC = () => {
       const packageData = Array.isArray(pData) ? pData : [];
       
       setCampaigns(campaignData);
-      setSubscribers(subscriberData.filter((s) => s.optInStatus === 'Active'));
+      // Fix: Filter subscribers where optInStatus is 'Active' or true
+      setSubscribers(subscriberData);
       setPackages(packageData);
     } catch (error) {
       console.error('❌ Error loading SMS campaign data:', error);
@@ -87,6 +88,11 @@ export const SmsCampaignPage: React.FC = () => {
     }
   };
 
+  // Helper to check if subscriber is active (handles both string and boolean)
+  const isActiveSubscriber = (sub: Subscriber) => {
+    return sub.optInStatus === 'Active' || sub.optInStatus === true;
+  };
+
   // Helper to match subscribers to a specific package
   const getSubscribersForPackage = (pkgTitle: string) => {
     const cleanPkgName = pkgTitle.replace(/^Package:\s*/i, '').trim().toLowerCase();
@@ -97,13 +103,13 @@ export const SmsCampaignPage: React.FC = () => {
     });
   };
 
-  // Recipient Calculation
+  // Recipient Calculation - FIXED
   const getEstimatedRecipients = () => {
     if (targetFilter === 'All Subscribers') {
       return subscribers.length;
     }
     if (targetFilter === 'Active Opt-in') {
-      return subscribers.filter((s) => s.optInStatus === 'Active').length;
+      return subscribers.filter(s => isActiveSubscriber(s)).length;
     }
     if (targetFilter === 'Package-specific') {
       return subscribers.filter((s) => s.packageInterest).length;
@@ -115,10 +121,13 @@ export const SmsCampaignPage: React.FC = () => {
     if (targetFilter.startsWith('Package:')) {
       return getSubscribersForPackage(targetFilter).length;
     }
-    return subscribers.length;
+    return subscribers.filter(s => isActiveSubscriber(s)).length;
   };
 
   const estimatedRecipientsCount = getEstimatedRecipients();
+
+  // Get active subscribers count
+  const activeSubscribersCount = subscribers.filter(s => isActiveSubscriber(s)).length;
 
   // SMS length calculation (160 standard chars = 1 SMS segment)
   const charLength = message.length;
@@ -177,6 +186,26 @@ export const SmsCampaignPage: React.FC = () => {
         <p className="text-xs text-slate-500 mt-0.5">Compose marketing SMS messages, preview mobile layout, send test messages, and dispatch campaigns.</p>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <p className="text-2xl font-black text-[#C8102E]">{subscribers.length}</p>
+          <p className="text-xs text-slate-500">Total Subscribers</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <p className="text-2xl font-black text-emerald-600">{activeSubscribersCount}</p>
+          <p className="text-xs text-slate-500">Active Opt-in</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <p className="text-2xl font-black text-amber-600">{packages.length}</p>
+          <p className="text-xs text-slate-500">Total Packages</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <p className="text-2xl font-black text-blue-600">{campaigns.length}</p>
+          <p className="text-xs text-slate-500">Campaigns Sent</p>
+        </div>
+      </div>
+
       {/* Campaign Composer Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Form (2 cols) */}
@@ -205,7 +234,7 @@ export const SmsCampaignPage: React.FC = () => {
                 onChange={(e) => setTargetFilter(e.target.value)}
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-[#1A5B4B]"
               >
-                <option value="Active Opt-in">Active Opt-in Subscribers ({subscribers.filter(s => s.optInStatus === 'Active').length})</option>
+                <option value="Active Opt-in">Active Opt-in Subscribers ({activeSubscribersCount})</option>
                 <option value="All Subscribers">All Subscribers ({subscribers.length})</option>
                 
                 <optgroup label="📦 Package Specific Subscribers">

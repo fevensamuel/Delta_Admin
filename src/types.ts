@@ -1,4 +1,5 @@
-export type UserRole = 'SuperAdmin' | 'Admin' | 'Editor';
+// src/types.ts
+export type UserRole = 'Admin';
 
 export interface User {
   id: string;
@@ -32,9 +33,10 @@ export interface Package {
   titleAr?: string;
   titleAm?: string;
   category: PackageCategory;
-  priceEtb?: number; // Primary ETB Price
-  priceUsd?: number; // USD Price (Auto-calculated)
-  price: number; // Fallback USD/ETB Price
+  priceEtb?: number;
+  priceUsd?: number;
+  priceSar?: number;
+  price: number;
   durationDays: number;
   departureCity?: string;
   imageUrl: string;
@@ -54,27 +56,28 @@ export interface GalleryItem {
   type: GalleryType;
   titleEn: string;
   titleAr?: string;
-  titleAm?: string;  // Added for Amharic titles
+  titleAm?: string;
   imageUrl: string;
+  thumbnailUrl?: string;
   videoUrl?: string;
   duration?: string;
   location?: string;
   description?: string;
   isActive: boolean;
   sortOrder?: number;
-  uploadDate: string;  // Frontend uses this
-  createdAt?: string;  // Backend returns this
-  updatedAt?: string;  // Backend returns this
+  uploadDate: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Subscriber {
   id: string;
   phone: string;
   email?: string;
-  name?: string;  // Added
-  channel: string;  // Changed from strict union to string for flexibility
-  packageInterestId?: string;  // Changed from packageInterest
-  packageInterest?: string;  // Kept for backward compatibility
+  name?: string;
+  channel: string;
+  packageInterestId?: string;
+  packageInterest?: string;
   optInStatus: 'Active' | 'Opt-out';
   dateSubscribed: string;
   createdAt?: string;
@@ -142,4 +145,51 @@ export interface DashboardStats {
   recentSubscribers: Subscriber[];
   clicksByCategory: { category: string; clicks: number }[];
   galleryTrend: { date: string; uploads: number }[];
+}
+
+// ===== NEW TYPES =====
+export interface FAQItem {
+  id: string;
+  q: string;
+  a: string;
+}
+
+export interface PackageFAQ {
+  id: string;
+  packageId: string;
+  questions: FAQItem[];
+}
+
+export interface SocialLink {
+  id: string;
+  platform: string;
+  url: string;
+  isActive: boolean;
+  icon: string;
+}
+
+export interface PriceLog {
+  id: string;
+  packageId: string;
+  priceUsd: number;
+  priceEtb: number;
+  priceSar: number;
+  previousPriceUsd: number | null;
+  previousPriceEtb: number | null;
+  previousPriceSar: number | null;
+  reason: string;
+  updatedBy: string;
+  updatedAt: string;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  bio: string;
+  imageUrl: string;
+  order: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Package, ItineraryDay, PackageCategory } from '../../types';
-import { Plus, Trash2, Calendar, X, ArrowLeft, MessageSquare, Upload, CheckCircle, Image as ImageIcon, Link, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Calendar, X, ArrowLeft, MessageSquare, Upload, CheckCircle, Image as ImageIcon, Link, RefreshCw, DollarSign } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { compressImageFile } from '../../utils/imageUtils';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
@@ -30,17 +30,20 @@ export const PackageForm: React.FC<PackageFormProps> = ({
   const [titleAm, setTitleAm] = useState(initialData?.titleAm || '');
   const [category, setCategory] = useState<PackageCategory>(initialData?.category || 'Standard');
   
-  // Primary Price is ETB
+  // Editable prices in all three currencies
+  const [priceUsd, setPriceUsd] = useState<number>(
+    initialData?.priceUsd || initialData?.price || 0
+  );
   const [priceEtb, setPriceEtb] = useState<number>(
-    initialData?.priceEtb || (initialData?.priceUsd || initialData?.price ? Math.round((initialData.priceUsd || initialData.price) * (rate || 159.98)) : 175000)
+    initialData?.priceEtb || Math.round((initialData?.priceUsd || initialData?.price || 0) * (rate || 159.98))
+  );
+  const [priceSar, setPriceSar] = useState<number>(
+    initialData?.priceSar || Math.round((initialData?.priceUsd || initialData?.price || 0) * 3.75)
   );
   
-  // Auto-calculated USD Price
-  const priceUsdDisplay = rate > 0 ? priceEtb / rate : 0;
-  const priceSarDisplay = priceUsdDisplay * 3.75;
   const [durationDays, setDurationDays] = useState<number>(initialData?.durationDays || 7);
   
-  // Image state & mode - FIXED: Store existing image URL
+  // Image state & mode
   const [imageUrl, setImageUrl] = useState(
     initialData?.imageUrl || ''
   );
@@ -64,12 +67,36 @@ export const PackageForm: React.FC<PackageFormProps> = ({
   );
 
   const [status, setStatus] = useState<'Active' | 'Archived' | 'Inactive'>(initialData?.status || 'Active');
+  const [priceReason, setPriceReason] = useState('');
 
   // Flag to prevent auto-generation on initial load in edit mode
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Field errors state for user-friendly messages
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Auto-fill prices from USD
+  const autoFillPrices = () => {
+    if (priceUsd > 0) {
+      setPriceEtb(Math.round(priceUsd * rate));
+      setPriceSar(Math.round(priceUsd * 3.75));
+      showToast('success', 'Prices auto-filled from USD');
+    } else {
+      showToast('error', 'Please enter a USD price first');
+    }
+  };
+
+  // Auto-fill USD from ETB
+  const autoFillFromEtb = () => {
+    if (priceEtb > 0 && rate > 0) {
+      const usd = priceEtb / rate;
+      setPriceUsd(Math.round(usd * 100) / 100);
+      setPriceSar(Math.round(usd * 3.75));
+      showToast('success', 'Prices auto-filled from ETB');
+    } else {
+      showToast('error', 'Please enter a valid ETB price');
+    }
+  };
 
   // Generate default itinerary based on duration
   const generateDefaultItinerary = (days: number) => {
@@ -148,9 +175,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
       return;
     }
     try {
-      // Store the file for submission
       setSelectedImageFile(file);
-      // Show preview
       const compressedDataUrl = await compressImageFile(file);
       setImageUrl(compressedDataUrl);
       showToast('success', 'Package image loaded from device');
@@ -210,31 +235,28 @@ export const PackageForm: React.FC<PackageFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Clear previous errors
     setFieldErrors({});
 
-    // Validation with user-friendly messages
     const errors: Record<string, string> = {};
     
     if (!titleEn.trim()) {
-      errors.titleEn = 'English Title is required. Please enter a title for your package.';
+      errors.titleEn = 'English Title is required.';
     }
     
     if (!category) {
-      errors.category = 'Category is required. Please select a package category.';
+      errors.category = 'Category is required.';
     }
     
-    if (priceEtb <= 0) {
-      errors.priceEtb = 'Valid price is required. Please enter a price greater than 0.';
+    if (priceUsd <= 0) {
+      errors.priceUsd = 'Valid USD price is required.';
     }
     
     if (durationDays <= 0) {
-      errors.durationDays = 'Duration must be at least 1 day. Please enter a valid number of days.';
+      errors.durationDays = 'Duration must be at least 1 day.';
     }
     
-    // FIX: Only require image if there's no existing image and no new file selected
     if (!imageUrl && !selectedImageFile && !initialData?.imageUrl) {
-      errors.imageUrl = 'Image is required. Please upload an image for the package.';
+      errors.imageUrl = 'Image is required.';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -247,13 +269,13 @@ export const PackageForm: React.FC<PackageFormProps> = ({
     try {
       const formData = new FormData();
       
-      // Append all fields
       formData.append('titleEn', titleEn.trim());
       formData.append('titleAr', titleAr.trim() || '');
       formData.append('titleAm', titleAm.trim() || '');
       formData.append('category', category);
-      formData.append('priceUsd', String(priceUsdDisplay));
-      formData.append('priceSar', String(priceSarDisplay));
+      formData.append('priceUsd', String(priceUsd));
+      formData.append('priceEtb', String(priceEtb || Math.round(priceUsd * rate)));
+      formData.append('priceSar', String(priceSar || Math.round(priceUsd * 3.75)));
       formData.append('durationDays', String(durationDays));
       formData.append('departureCity', 'Addis Ababa');
       formData.append('inclusions', JSON.stringify(inclusions));
@@ -261,16 +283,15 @@ export const PackageForm: React.FC<PackageFormProps> = ({
       formData.append('itinerary', JSON.stringify(itinerary));
       formData.append('status', status);
       formData.append('isActive', String(status === 'Active'));
+      if (priceReason) {
+        formData.append('reason', priceReason);
+      }
 
-      // FIX: Handle image properly - preserve existing if no new file
       if (selectedImageFile) {
-        // New file uploaded
         formData.append('packageImage', selectedImageFile);
       } else if (imageUrl && imageUrl.startsWith('http')) {
-        // Existing URL image (keep it)
         formData.append('imageUrl', imageUrl);
       } else if (initialData?.imageUrl) {
-        // Preserve existing image URL from initial data
         formData.append('imageUrl', initialData.imageUrl);
       }
 
@@ -280,7 +301,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
       console.error('❌ Submit error:', error);
       const errorMessage = error?.response?.data?.error || 
                           error?.message || 
-                          'Failed to create package. Please check all fields and try again.';
+                          'Failed to save package.';
       showToast('error', errorMessage);
     }
   };
@@ -315,7 +336,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
         </div>
       </div>
 
-      {/* WhatsApp Clicks Display (Read-only counter for existing package) */}
+      {/* WhatsApp Clicks Display */}
       {initialData && (
         <div className="bg-[#C8102E]/5 border border-[#C8102E]/20 p-4 rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -324,7 +345,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
             </div>
             <div>
               <h4 className="text-sm font-bold text-[#111827]">WhatsApp Click Lead Counter</h4>
-              <p className="text-xs text-[#718096]">Read-only counter showing customer engagement for this package</p>
+              <p className="text-xs text-[#718096]">Read-only counter showing customer engagement</p>
             </div>
           </div>
           <div className="text-right">
@@ -376,7 +397,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-[#111827] mb-1">Category *</label>
             <select
@@ -392,117 +413,133 @@ export const PackageForm: React.FC<PackageFormProps> = ({
             {fieldErrors.category && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.category}</p>}
           </div>
 
-          {/* Primary - Price (ETB) */}
           <div>
-            <label htmlFor="priceEtb" className="block text-xs font-bold text-[#111827] mb-1">
-              Price (ETB) *
-            </label>
-            <div className="relative">
+            <label className="block text-xs font-bold text-[#111827] mb-1">Duration (Days) *</label>
+            <input
+              type="number"
+              required
+              min={1}
+              step={1}
+              value={durationDays || ''}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '') {
+                  setDurationDays(0);
+                } else {
+                  const num = parseInt(val, 10);
+                  if (!isNaN(num) && num >= 0) {
+                    setDurationDays(num);
+                  }
+                }
+              }}
+              className={`w-full px-3.5 py-2 rounded-lg border ${fieldErrors.durationDays ? 'border-red-500' : 'border-[#E2E8F0]'} text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]`}
+              placeholder="Enter duration in days"
+            />
+            {fieldErrors.durationDays && (
+              <p className="text-red-500 text-[10px] mt-1">{fieldErrors.durationDays}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Editable Multi-Currency Pricing */}
+        <div className="border-t border-[#E2E8F0] pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-bold text-[#111827]">Pricing (All Currencies)</label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={autoFillPrices}
+                className="px-3 py-1.5 rounded-lg bg-[#2D7D6B] hover:bg-[#236355] text-white text-xs font-bold transition-colors"
+              >
+                <DollarSign className="w-3.5 h-3.5 inline mr-1" /> Auto-fill from USD
+              </button>
+              <button
+                type="button"
+                onClick={autoFillFromEtb}
+                className="px-3 py-1.5 rounded-lg bg-[#111827] hover:bg-black text-white text-xs font-bold transition-colors"
+              >
+                Auto-fill from ETB
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Price (USD) *
+              </label>
               <input
-                id="priceEtb"
                 type="number"
                 required
+                min={1}
+                step={0.01}
+                value={priceUsd || ''}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  setPriceUsd(val);
+                }}
+                className={`w-full px-3.5 py-2 rounded-lg border ${fieldErrors.priceUsd ? 'border-red-500' : 'border-[#E2E8F0]'} text-sm font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]`}
+                placeholder="Enter USD"
+              />
+              {fieldErrors.priceUsd && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.priceUsd}</p>}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Price (ETB)
+              </label>
+              <input
+                type="number"
                 min={1}
                 value={priceEtb || ''}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value) || 0;
                   setPriceEtb(val);
                 }}
-                placeholder="Enter price in Ethiopian Birr (e.g., 185000)"
-                className={`w-full px-3.5 py-2 rounded-lg border ${fieldErrors.priceEtb ? 'border-red-500' : 'border-[#E2E8F0]'} text-sm font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]`}
+                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]"
+                placeholder="Enter ETB"
               />
+              <p className="text-[10px] text-[#718096] mt-1">
+                Auto-calculated from USD: {priceUsd > 0 ? Math.round(priceUsd * rate).toLocaleString() : '—'} ETB
+              </p>
             </div>
-            <p className="text-[10px] text-[#718096] mt-1">
-              1 USD = {rate.toFixed(2)} ETB
-            </p>
-            {fieldErrors.priceEtb && <p className="text-red-500 text-[10px] mt-1">{fieldErrors.priceEtb}</p>}
-          </div>
 
-          {/* Secondary - Price (USD) - Auto-calculated */}
-          <div>
-            <label htmlFor="priceUsd" className="block text-xs font-bold text-[#111827] mb-1">
-              Price (USD) - Auto-calculated
-            </label>
-            <div className="relative">
-              <input
-                id="priceUsd"
-                type="text"
-                readOnly
-                disabled
-                value={priceUsdDisplay ? `$${priceUsdDisplay.toFixed(2)}` : 'Auto-calculated'}
-                className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm font-bold text-[#111827] cursor-not-allowed opacity-80"
-              />
-            </div>
-            <p className="text-[10px] text-emerald-600 font-medium mt-1">
-              Auto-calculated based on real-time exchange rate
-            </p>
-          </div>
-
-          {/* Price (SAR) - Auto-calculated */}
-          <div>
-            <label className="block text-xs font-bold text-[#111827] mb-1">
-              Price (SAR) - Auto-calculated
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                readOnly
-                disabled
-                value={priceSarDisplay ? `${priceSarDisplay.toFixed(2)} SAR` : 'Auto-calculated'}
-                className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm font-bold text-[#111827] cursor-not-allowed opacity-80"
-              />
-            </div>
-            <p className="text-[10px] text-emerald-600 font-medium mt-1">
-              Auto-calculated based on USD price (1 USD ≈ 3.75 SAR)
-            </p>
-          </div>
-
-          {/* Duration (Days) - CLEARABLE WITH VALIDATION */}
-          <div>
-            <label className="block text-xs font-bold text-[#111827] mb-1">Duration (Days) *</label>
-            <div className="relative">
+            <div>
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Price (SAR)
+              </label>
               <input
                 type="number"
-                required
                 min={1}
-                step={1}
-                value={durationDays || ''}
+                value={priceSar || ''}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === '') {
-                    setDurationDays(0);
-                    setFieldErrors(prev => ({ ...prev, durationDays: 'Duration must be at least 1 day' }));
-                  } else {
-                    const num = parseInt(val, 10);
-                    if (!isNaN(num) && num >= 0) {
-                      setDurationDays(num);
-                      if (num > 0) {
-                        setFieldErrors(prev => ({ ...prev, durationDays: '' }));
-                      }
-                    }
-                  }
+                  const val = parseFloat(e.target.value) || 0;
+                  setPriceSar(val);
                 }}
-                onBlur={() => {
-                  if (durationDays <= 0) {
-                    setFieldErrors(prev => ({ ...prev, durationDays: 'Duration must be at least 1 day' }));
-                    showToast('error', 'Duration must be at least 1 day');
-                    setDurationDays(1);
-                  }
-                }}
-                className={`w-full px-3.5 py-2 rounded-lg border ${fieldErrors.durationDays ? 'border-red-500' : 'border-[#E2E8F0]'} text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]`}
-                placeholder="Enter duration in days"
+                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C9A84C]"
+                placeholder="Enter SAR"
               />
-              {durationDays <= 0 && !fieldErrors.durationDays && (
-                <p className="text-red-500 text-[10px] mt-1">Duration is required (minimum 1 day)</p>
-              )}
-              {fieldErrors.durationDays && (
-                <p className="text-red-500 text-[10px] mt-1">{fieldErrors.durationDays}</p>
-              )}
+              <p className="text-[10px] text-[#718096] mt-1">
+                Auto-calculated from USD: {priceUsd > 0 ? Math.round(priceUsd * 3.75).toLocaleString() : '—'} SAR
+              </p>
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">
-              ⚡ Itinerary days auto-update when changed ({itinerary.length} days)
-            </p>
           </div>
+
+          {/* Price Change Reason (for logging) */}
+          {initialData && (
+            <div className="mt-3">
+              <label className="block text-xs font-bold text-[#111827] mb-1">
+                Price Change Reason <span className="font-normal text-[#718096]">(Optional, for audit log)</span>
+              </label>
+              <input
+                type="text"
+                value={priceReason}
+                onChange={(e) => setPriceReason(e.target.value)}
+                placeholder="e.g. Seasonal adjustment, Updated package inclusions"
+                className="w-full px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
+              />
+            </div>
+          )}
         </div>
 
         {/* Real-time Exchange Rate Banner */}
@@ -620,7 +657,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
                     setImageUrl(e.target.value);
                     setSelectedImageFile(null);
                   }}
-                  placeholder="https://images.unsplash.com/photo-..."
+                  placeholder="https://example.com/image.jpg"
                   className={`w-full px-3.5 py-2 rounded-lg border ${fieldErrors.imageUrl ? 'border-red-500' : 'border-[#E2E8F0]'} text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#C8102E]`}
                 />
                 {imageUrl && imageUrl.startsWith('http') && (
@@ -635,7 +672,6 @@ export const PackageForm: React.FC<PackageFormProps> = ({
 
       {/* Inclusions & Available Dates */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Inclusions */}
         <div className="bg-white p-6 rounded-lg border border-[#E2E8F0] shadow-xs space-y-4">
           <h3 className="text-base font-bold text-[#111827]">Inclusions</h3>
           <div className="flex gap-2">
@@ -660,7 +696,6 @@ export const PackageForm: React.FC<PackageFormProps> = ({
               <Plus className="w-4 h-4" /> Add
             </button>
           </div>
-
           <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
             {inclusions.length === 0 ? (
               <p className="text-xs text-[#718096] italic">No inclusions added yet</p>
@@ -681,7 +716,6 @@ export const PackageForm: React.FC<PackageFormProps> = ({
           </div>
         </div>
 
-        {/* Available Dates */}
         <div className="bg-white p-6 rounded-lg border border-[#E2E8F0] shadow-xs space-y-4">
           <h3 className="text-base font-bold text-[#111827]">Available Departure Dates</h3>
           <div className="flex gap-2">
@@ -699,7 +733,6 @@ export const PackageForm: React.FC<PackageFormProps> = ({
               <Plus className="w-4 h-4" /> Add Date
             </button>
           </div>
-
           <div className="flex flex-wrap gap-2 pt-1">
             {availableDates.length === 0 ? (
               <p className="text-xs text-[#718096] italic">No dates added yet</p>
@@ -727,7 +760,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-[#111827]">Day-by-Day Itinerary</h3>
-            <p className="text-xs text-[#718096]">Specify schedule details for each day of the journey. ({itinerary.length} days)</p>
+            <p className="text-xs text-[#718096]">Specify schedule details for each day. ({itinerary.length} days)</p>
           </div>
           <button
             type="button"
@@ -742,7 +775,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
           {itinerary.length === 0 ? (
             <div className="text-center py-8 text-[#718096]">
               <p className="text-sm font-medium">No itinerary days set.</p>
-              <p className="text-xs mt-1">Click "Add Day" to start building the itinerary.</p>
+              <p className="text-xs mt-1">Click "Add Day" to start building.</p>
             </div>
           ) : (
             itinerary.map((day, idx) => (
@@ -759,20 +792,19 @@ export const PackageForm: React.FC<PackageFormProps> = ({
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <input
                     type="text"
                     value={day.title}
                     onChange={(e) => handleUpdateItineraryDay(idx, 'title', e.target.value)}
-                    placeholder="Day title (e.g. Arrival in Makkah)"
+                    placeholder="Day title"
                     className="w-full px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-sm bg-white text-[#111827]"
                   />
                   <input
                     type="text"
                     value={day.description}
                     onChange={(e) => handleUpdateItineraryDay(idx, 'description', e.target.value)}
-                    placeholder="Day description details..."
+                    placeholder="Day description"
                     className="w-full px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-sm bg-white text-[#111827]"
                   />
                 </div>

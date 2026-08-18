@@ -76,9 +76,15 @@ export const SubscriberManager: React.FC = () => {
     }
   };
 
+  // Helper to check if subscriber is active (handles both string and boolean)
+  const isActiveSubscriber = (sub: Subscriber) => {
+    return sub.optInStatus === 'Active' || sub.optInStatus === true;
+  };
+
   const handleToggleOptStatus = async (sub: Subscriber) => {
     try {
-      const newStatus = sub.optInStatus === 'Active' ? 'Opt-out' : 'Active';
+      // Convert to boolean: true = Active, false = Opt-out
+      const newStatus = isActiveSubscriber(sub) ? false : true;
       await updateSubscriberStatusApi(sub.id, newStatus);
       showToast('success', `Status updated for ${sub.phone}`);
       loadSubscribers();
@@ -131,7 +137,7 @@ export const SubscriberManager: React.FC = () => {
       s.email || '',
       s.channel || '',
       `"${s.packageInterest || ''}"`,
-      s.optInStatus || 'Active',
+      isActiveSubscriber(s) ? 'Active' : 'Opt-out',
       s.dateSubscribed || new Date().toISOString().split('T')[0]
     ]);
 
@@ -156,7 +162,14 @@ export const SubscriberManager: React.FC = () => {
         (sub.packageInterest && sub.packageInterest.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesChannel = channelFilter === 'All' || sub.channel === channelFilter;
-      const matchesStatus = statusFilter === 'All' || sub.optInStatus === statusFilter;
+      
+      // Fix: Handle both string and boolean for status filter
+      let matchesStatus = true;
+      if (statusFilter === 'Active') {
+        matchesStatus = isActiveSubscriber(sub);
+      } else if (statusFilter === 'Opt-out') {
+        matchesStatus = !isActiveSubscriber(sub);
+      }
 
       const matchesPackage =
         packageFilter === 'All' ||
@@ -341,15 +354,16 @@ export const SubscriberManager: React.FC = () => {
                       {sub.packageInterest || 'General Offers'}
                     </td>
 
+                    {/* Fixed Status Column - Handles both string and boolean */}
                     <td className="p-3.5">
                       <span
                         className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          sub.optInStatus === 'Active'
+                          isActiveSubscriber(sub)
                             ? 'bg-emerald-100 text-emerald-800'
                             : 'bg-rose-100 text-rose-800'
                         }`}
                       >
-                        {sub.optInStatus || 'Active'}
+                        {isActiveSubscriber(sub) ? 'Active' : 'Opt-out'}
                       </span>
                     </td>
 
@@ -376,7 +390,7 @@ export const SubscriberManager: React.FC = () => {
                         <button
                           onClick={() => handleToggleOptStatus(sub)}
                           className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
-                          title={sub.optInStatus === 'Active' ? 'Mark as Opt-out' : 'Mark as Active'}
+                          title={isActiveSubscriber(sub) ? 'Mark as Opt-out' : 'Mark as Active'}
                         >
                           <UserX className="w-3.5 h-3.5 text-amber-600" />
                         </button>

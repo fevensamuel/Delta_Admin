@@ -12,7 +12,10 @@ import {
   LogOut,
   X,
   Compass,
-  Send
+  Send,
+  Share2, 
+  HelpCircle, 
+  History 
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -35,6 +38,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { label: 'Subscribers', path: '/subscribers', icon: Users },
     { label: 'SMS Campaigns', path: '/sms', icon: Send },
     { label: 'Booking Leads', path: '/leads', icon: BarChart3 },
+  ];
+
+  const settingsNav = [
+    { label: 'Social Media', path: '/settings/social', icon: Share2 },
+    { label: 'Team Members', path: '/settings/team-members', icon: Users },
+    { label: 'FAQs', path: '/settings/faqs', icon: HelpCircle },
+    { label: 'Price Logs', path: '/settings/price-logs', icon: History },
   ];
 
   const renderNavGroup = (title: string, items: Array<{ label: string; path: string; icon: any }>) => (
@@ -104,6 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <nav className="flex-1 py-4 overflow-y-auto">
           {renderNavGroup('Main Management', mainManagementNav)}
           {renderNavGroup('Communications & Leads', communicationsNav)}
+          {renderNavGroup('Settings', settingsNav)}
         </nav>
 
         {/* User Card Footer */}

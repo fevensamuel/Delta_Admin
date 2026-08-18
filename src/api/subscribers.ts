@@ -4,9 +4,11 @@ import { Subscriber } from '../types';
 export async function getSubscribersApi(): Promise<Subscriber[]> {
   try {
     const res = await apiClient.get('/admin/subscribers');
-    return res.data;
+    // The backend returns { status, success, count, data: [...] }
+    return res.data?.data || [];
   } catch (error) {
-    throw new Error((error as Error)?.message || 'Failed to load subscribers');
+    console.error('Error fetching subscribers:', error);
+    return [];
   }
 }
 
@@ -19,10 +21,10 @@ export async function bulkImportSubscribersApi(subscribers: Omit<Subscriber, 'id
   }
 }
 
-export async function updateSubscriberStatusApi(id: string, optInStatus: 'Active' | 'Opt-out'): Promise<Subscriber> {
+export async function updateSubscriberStatusApi(id: string, optInStatus: boolean): Promise<Subscriber> {
   try {
     const res = await apiClient.put(`/admin/subscribers/${id}`, { optInStatus });
-    return res.data;
+    return res.data?.data || res.data;
   } catch (error) {
     throw new Error((error as Error)?.message || 'Failed to update subscriber status');
   }
