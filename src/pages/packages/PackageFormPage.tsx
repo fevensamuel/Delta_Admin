@@ -26,8 +26,25 @@ export const PackageFormPage: React.FC = () => {
     try {
       const found = await getPackageApi(pkgId);
       if (found) {
-        setPackageToEdit(found);
-        console.log('✅ Package loaded for edit:', found.titleEn);
+        // Ensure all fields are properly initialized
+        const processedData = {
+          ...found,
+          inclusions: Array.isArray(found.inclusions) ? found.inclusions : [],
+          availableDates: Array.isArray(found.availableDates) ? found.availableDates : [],
+          itinerary: Array.isArray(found.itinerary) ? found.itinerary : [],
+          persons: Array.isArray(found.persons) ? found.persons : [],
+          discounts: Array.isArray(found.discounts) ? found.discounts : [],
+          priceType: found.priceType || 'single',
+          priceUsd: found.priceUsd || found.price || 0,
+          priceEtb: found.priceEtb || 0,
+          priceSar: found.priceSar || 0,
+          status: found.status || (found.isActive ? 'Active' : 'Inactive'),
+        };
+        setPackageToEdit(processedData);
+        console.log('✅ Package loaded for edit:', processedData.titleEn);
+        console.log('📊 Price Type:', processedData.priceType);
+        console.log('👤 Persons:', processedData.persons?.length || 0);
+        console.log('🏷️ Discounts:', processedData.discounts?.length || 0);
       } else {
         showToast('error', 'Package not found');
         navigate('/packages');
@@ -35,6 +52,7 @@ export const PackageFormPage: React.FC = () => {
     } catch (error) {
       console.error('❌ Error fetching package:', error);
       showToast('error', 'Error fetching package details');
+      navigate('/packages');
     } finally {
       setIsLoading(false);
     }
@@ -72,9 +90,11 @@ export const PackageFormPage: React.FC = () => {
     <div className="space-y-6 animate-in fade-in">
       <div>
         <h2 className="text-xl font-extrabold text-[#1A1A2E]">
-          {id ? `Edit Package: ${packageToEdit?.titleEn}` : 'Create New Umrah / Hajj Package'}
+          {id ? `Edit Package: ${packageToEdit?.titleEn || ''}` : 'Create New Umrah / Hajj Package'}
         </h2>
-        <p className="text-xs text-[#718096] mt-0.5">Fill in package details, multilingual titles, itinerary, and inclusions.</p>
+        <p className="text-xs text-[#718096] mt-0.5">
+          Fill in package details, multilingual titles, pricing (single/range/per-person), discounts, and itinerary.
+        </p>
       </div>
 
       <PackageForm

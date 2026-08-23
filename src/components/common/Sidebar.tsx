@@ -14,8 +14,10 @@ import {
   Compass,
   Send,
   Share2, 
-  HelpCircle, 
-  History 
+  HelpCircle,
+  History,
+  Building2,
+  Quote
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -41,10 +43,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   ];
 
   const settingsNav = [
-    { label: 'Social Media', path: '/settings/social', icon: Share2 },
-    { label: 'Team Members', path: '/settings/team-members', icon: Users },
-    { label: 'FAQs', path: '/settings/faqs', icon: HelpCircle },
-    { label: 'Price Logs', path: '/settings/price-logs', icon: History },
+  { label: 'Social Media', path: '/settings/social', icon: Share2 },
+  { label: 'Team Members', path: '/settings/team-members', icon: Users },
+  { label: 'Office Images', path: '/settings/office-images', icon: Building2 },
+  { label: 'Testimonials', path: '/settings/testimonials', icon: Quote },
+  { label: 'FAQs', path: '/settings/faqs', icon: HelpCircle },
+  { label: 'Price Logs', path: '/settings/price-logs', icon: History },
   ];
 
   const renderNavGroup = (title: string, items: Array<{ label: string; path: string; icon: any }>) => (

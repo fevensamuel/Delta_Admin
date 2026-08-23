@@ -16,16 +16,15 @@ import {
   Download,
   Trash2,
   UserX,
-  ExternalLink,
   Package as PackageIcon,
   CheckCircle2
 } from 'lucide-react';
 
-interface PackagePersonsTableProps {
+interface PackageSubscribersTableProps {
   initialPackageTitle?: string;
 }
 
-export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initialPackageTitle }) => {
+export const PackageSubscribersTable: React.FC<PackageSubscribersTableProps> = ({ initialPackageTitle }) => {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
@@ -53,14 +52,12 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
         getSubscribersApi(),
         getPackagesApi()
       ]);
-      // Use ensureArray to guarantee arrays
       setSubscribers(ensureArray<Subscriber>(sData));
       setPackages(ensureArray<Package>(pData));
-      console.log('✅ PackagePersonsTable loaded:', {
+      console.log('✅ PackageSubscribersTable loaded:', {
         subscribers: sData?.length || 0,
         packages: pData?.length || 0
       });
-      console.log('📦 Packages in PackagePersonsTable:', pData);
     } catch (error) {
       console.error('❌ Error loading data:', error);
       showToast('error', 'Failed to load package subscription records');
@@ -83,7 +80,7 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
   };
 
   const handleDelete = async (id: string, phone: string) => {
-    if (!window.confirm(`Are you sure you want to remove person ${phone} from package records?`)) return;
+    if (!window.confirm(`Are you sure you want to remove ${phone} from records?`)) return;
     try {
       await deleteSubscriberApi(id);
       showToast('success', 'Subscriber removed');
@@ -93,7 +90,6 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
     }
   };
 
-  // Filter subscribers by selected package interest & search term
   const subscribersArray = ensureArray<Subscriber>(subscribers);
   const packagesArray = ensureArray<Package>(packages);
 
@@ -116,12 +112,10 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
     return matchesPackage && matchesSearch && matchesStatus;
   });
 
-  // Calculate summary metrics
   const totalEnrolled = subscribersArray.length;
   const activeOptIns = subscribersArray.filter((s) => s.optInStatus === 'Active').length;
   const selectedPkgCount = filteredSubscribers.length;
 
-  // Pagination calculation
   const totalPages = Math.ceil(filteredSubscribers.length / pageSize) || 1;
   const paginatedSubscribers = filteredSubscribers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -145,12 +139,12 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `package_persons_${selectedPackageTitle.replace(/\s+/g, '_')}.csv`);
+    link.setAttribute('download', `subscribers_${selectedPackageTitle.replace(/\s+/g, '_')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
-    showToast('success', 'Exported package subscribers CSV');
+    showToast('success', 'Exported subscribers CSV');
   };
 
   const handleSendPackageSms = (pkgTitle: string) => {
@@ -158,7 +152,7 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
   };
 
   if (isLoading) {
-    return <LoadingSpinner text="Loading package subscribers table..." />;
+    return <LoadingSpinner text="Loading subscribers..." />;
   }
 
   return (
@@ -170,7 +164,7 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
             <Users className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Enrolled Persons</p>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Subscribers</p>
             <p className="text-lg font-bold text-slate-900">{totalEnrolled}</p>
           </div>
         </div>
@@ -180,14 +174,14 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Active Opt-In Contacts</p>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Active Opt-Ins</p>
             <p className="text-lg font-bold text-emerald-700">{activeOptIns}</p>
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Filtered View Count</p>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Filtered View</p>
             <p className="text-lg font-bold text-[#2D7D6B]">{selectedPkgCount} Records</p>
           </div>
           <button
@@ -202,7 +196,6 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
       {/* Filter & Toolbar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
-          {/* Select Specific Package */}
           <div className="flex items-center gap-2">
             <PackageIcon className="w-4 h-4 text-[#2D7D6B]" />
             <select
@@ -229,7 +222,6 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
             </select>
           </div>
 
-          {/* Search Box */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
             <input
@@ -239,12 +231,11 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by person phone, email or package name..."
+              placeholder="Search by phone, email or package name..."
               className="w-full pl-10 pr-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#2D7D6B]"
             />
           </div>
 
-          {/* Status Filter */}
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-slate-500" />
             <select
@@ -262,7 +253,6 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
           </div>
         </div>
 
-        {/* Quick Send SMS Action for current package */}
         {selectedPackageTitle !== 'All' && (
           <button
             onClick={() => handleSendPackageSms(selectedPackageTitle)}
@@ -273,25 +263,25 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
         )}
       </div>
 
-      {/* Package Persons Table View */}
+      {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
               <tr>
-                <th className="p-3.5 pl-5">Person Contact</th>
-                <th className="p-3.5">Subscribed Package</th>
+                <th className="p-3.5 pl-5">Contact</th>
+                <th className="p-3.5">Package Interest</th>
                 <th className="p-3.5">Channel</th>
-                <th className="p-3.5">Opt-in Status</th>
+                <th className="p-3.5">Status</th>
                 <th className="p-3.5">Subscribed Date</th>
-                <th className="p-3.5 text-right pr-5">Target Actions</th>
+                <th className="p-3.5 text-right pr-5">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
               {paginatedSubscribers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-slate-500">
-                    {subscribersArray.length === 0 ? 'No subscribers found.' : 'No persons subscribed to this package match your filter criteria.'}
+                    {subscribersArray.length === 0 ? 'No subscribers found.' : 'No persons match your filter criteria.'}
                   </td>
                 </tr>
               ) : (
@@ -308,15 +298,13 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
 
                   return (
                     <tr key={sub.id} className="hover:bg-slate-50 transition-colors">
-                      {/* Person Contact */}
                       <td className="p-3.5 pl-5">
                         <div>
                           <p className="font-bold text-slate-900 font-mono text-sm">{sub.phone}</p>
-                          <p className="text-[11px] text-slate-500 font-normal">{sub.email || 'No email registered'}</p>
+                          <p className="text-[11px] text-slate-500 font-normal">{sub.email || 'No email'}</p>
                         </div>
                       </td>
 
-                      {/* Subscribed Package */}
                       <td className="p-3.5">
                         <div className="flex items-center gap-2">
                           <span
@@ -334,14 +322,12 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
                         </div>
                       </td>
 
-                      {/* Source Channel */}
                       <td className="p-3.5">
                         <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold text-[10px]">
                           {sub.channel || 'Unknown'}
                         </span>
                       </td>
 
-                      {/* Opt-in Status */}
                       <td className="p-3.5">
                         <span
                           className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -354,13 +340,10 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
                         </span>
                       </td>
 
-                      {/* Subscribed Date */}
                       <td className="p-3.5 text-slate-500">{sub.dateSubscribed || 'N/A'}</td>
 
-                      {/* Actions */}
                       <td className="p-3.5 pr-5 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {/* WhatsApp Link */}
                           <a
                             href={`https://wa.me/${sub.phone.replace(/[^0-9]/g, '')}`}
                             target="_blank"
@@ -371,7 +354,6 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
                             <MessageSquare className="w-3.5 h-3.5" />
                           </a>
 
-                          {/* Send Package SMS */}
                           <button
                             onClick={() => handleSendPackageSms(pkgTitle)}
                             className="p-1.5 rounded-lg border border-slate-200 text-[#2D7D6B] hover:bg-[#2D7D6B]/10 transition-colors cursor-pointer"
@@ -380,7 +362,6 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
                             <Send className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Toggle Status */}
                           <button
                             onClick={() => handleToggleOptStatus(sub)}
                             className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
@@ -389,7 +370,6 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
                             <UserX className="w-3.5 h-3.5 text-amber-600" />
                           </button>
 
-                          {/* Delete */}
                           <button
                             onClick={() => handleDelete(sub.id, sub.phone)}
                             className="p-1.5 rounded-lg border border-slate-200 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
@@ -407,7 +387,6 @@ export const PackagePersonsTable: React.FC<PackagePersonsTableProps> = ({ initia
           </table>
         </div>
 
-        {/* Pagination Bar */}
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}

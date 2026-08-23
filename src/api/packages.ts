@@ -1,3 +1,4 @@
+// src/api/packages.ts
 import { apiClient, StorageService } from './client';
 import { Package } from '../types';
 
@@ -61,7 +62,7 @@ export async function createPackageApi(data: FormData): Promise<Package> {
   }
 }
 
-// Update package - FIXED: Handle both FormData and JSON, preserve image
+// Update package - Handle both FormData and JSON, preserve all data
 export async function updatePackageApi(id: string, data: FormData | Partial<Package>): Promise<Package> {
   try {
     const isFormData = data instanceof FormData;

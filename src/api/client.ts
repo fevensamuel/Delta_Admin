@@ -11,7 +11,7 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 30000 // Increased timeout for video uploads
+  timeout: 30000 // Timeout for video uploads
 });
 
 // Interceptor to inject JWT token
@@ -56,6 +56,23 @@ export const ensureArray = <T,>(data: any): T[] => {
   }
   
   return [];
+};
+
+// Helper to get full image URL
+export const getFullImageUrl = (path: string): string => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  if (path.startsWith('data:')) {
+    return path;
+  }
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const baseWithoutApi = API_BASE_URL.replace(/\/api$/, '');
+  if (path.startsWith('/uploads')) {
+    return `${baseWithoutApi}${path}`;
+  }
+  return `${baseWithoutApi}${path}`;
 };
 
 // In-Memory store cache

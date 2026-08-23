@@ -19,6 +19,8 @@ export interface AuthState {
 }
 
 export type PackageCategory = 'Economy' | 'Standard' | 'Premium' | 'VIP';
+export type PriceType = 'single' | 'range';
+export type DiscountType = 'percentage' | 'fixed';
 
 export interface ItineraryDay {
   dayNumber: number;
@@ -27,16 +29,60 @@ export interface ItineraryDay {
   image?: string;
 }
 
+// Person/Group pricing for packages
+export interface PersonPrice {
+  id: string;
+  label: string;
+  priceUsd: number;
+  priceEtb: number;
+  priceSar: number;
+  minAge?: number;
+  maxAge?: number;
+  isDefault?: boolean;
+  isActive: boolean;
+}
+
+// Discount structure
+export interface Discount {
+  id: string;
+  type: DiscountType;
+  value: number;
+  discountedPriceUsd?: number;
+  discountedPriceEtb?: number;
+  discountedPriceSar?: number;
+  label: string;
+  description?: string;
+  minPersons?: number;
+  maxPersons?: number;
+  ageGroup?: string;
+  isActive: boolean;
+}
+
 export interface Package {
   id: string;
   titleEn: string;
   titleAr?: string;
   titleAm?: string;
   category: PackageCategory;
-  priceEtb?: number;
-  priceUsd?: number;
-  priceSar?: number;
+  
+  // Main pricing
   price: number;
+  priceUsd?: number;
+  priceEtb?: number;
+  priceSar?: number;
+  priceType?: PriceType;
+  
+  // Price range
+  priceUsdMin?: number;
+  priceUsdMax?: number;
+  priceEtbMin?: number;
+  priceEtbMax?: number;
+  priceSarMin?: number;
+  priceSarMax?: number;
+  
+  // Discounts
+  discounts?: Discount[];
+  
   durationDays: number;
   departureCity?: string;
   imageUrl: string;
@@ -45,6 +91,7 @@ export interface Package {
   itinerary: ItineraryDay[];
   whatsappClicks: number;
   status: 'Active' | 'Archived' | 'Inactive';
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -147,7 +194,6 @@ export interface DashboardStats {
   galleryTrend: { date: string; uploads: number }[];
 }
 
-// ===== NEW TYPES =====
 export interface FAQItem {
   id: string;
   q: string;
@@ -171,6 +217,8 @@ export interface SocialLink {
 export interface PriceLog {
   id: string;
   packageId: string;
+  packageTitle?: string;
+  packageCategory?: string;
   priceUsd: number;
   priceEtb: number;
   priceSar: number;
@@ -190,6 +238,30 @@ export interface TeamMember {
   imageUrl: string;
   order: number;
   isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OfficeImage {
+  id: string;
+  title?: string;
+  imageUrl: string;
+  description?: string;
+  order?: number;
+  isActive?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Testimonial {
+  id: string;
+  name: string;
+  location: string;
+  rating: number;
+  text: string;
+  textAr?: string;
+  date: string;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }

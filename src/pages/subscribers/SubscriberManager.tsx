@@ -6,7 +6,8 @@ import {
   updateSubscriberStatusApi,
   deleteSubscriberApi,
   bulkDeleteSubscribersApi,
-  bulkImportSubscribersApi
+  bulkImportSubscribersApi,
+  createSubscriberApi
 } from '../../api/subscribers';
 import { getPackagesApi } from '../../api/packages';
 import { BulkImportModal } from '../../components/modals/BulkImportModal';
@@ -25,8 +26,145 @@ import {
   Mail,
   UserX,
   Send,
-  Package as PackageIcon
+  Package as PackageIcon,
+  Plus,
+  UserPlus,
+  X
 } from 'lucide-react';
+
+interface AddSubscriberModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onAdd: (subscriber: Omit<Subscriber, 'id' | 'dateSubscribed'>) => Promise<void>;
+}
+
+const AddSubscriberModal: React.FC<AddSubscriberModalProps> = ({ isOpen, onClose, onAdd }) => {
+  const { showToast } = useToast();
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [channel, setChannel] = useState('Web Form');
+  const [packageInterest, setPackageInterest] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phone.trim()) {
+      showToast('error', 'Phone number is required');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await onAdd({
+        phone: phone.trim(),
+        email: email.trim() || '',
+        name: name.trim() || '',
+        channel: channel,
+        packageInterest: packageInterest || '',
+        optInStatus: true
+      });
+      // Reset form after successful submission
+      setPhone('');
+      setEmail('');
+      setName('');
+      setChannel('Web Form');
+      setPackageInterest('');
+      onClose();
+    } catch (error) {
+      showToast('error', 'Failed to add subscriber');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-[#111827]">Add Subscriber</h3>
+          <button onClick={onClose} className="text-[#718096] hover:text-[#111827]">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-[#111827] mb-1">Phone Number *</label>
+            <input
+              type="tel"
+              required
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+251 91 123 4567"
+              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[#111827] mb-1">Name (Optional)</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Full name"
+              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[#111827] mb-1">Email (Optional)</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@example.com"
+              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[#111827] mb-1">Channel</label>
+            <select
+              value={channel}
+              onChange={(e) => setChannel(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E]"
+            >
+              <option value="Web Form">Web Form</option>
+              <option value="WhatsApp">WhatsApp</option>
+              <option value="Footer">Footer</option>
+              <option value="Direct">Direct</option>
+              <option value="Bulk Import">Bulk Import</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[#111827] mb-1">Package Interest (Optional)</label>
+            <input
+              type="text"
+              value={packageInterest}
+              onChange={(e) => setPackageInterest(e.target.value)}
+              placeholder="e.g. Premium Umrah Package"
+              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
+            />
+          </div>
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 rounded-lg bg-[#C8102E] hover:bg-[#A00D24] text-white font-bold text-sm transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? 'Adding...' : 'Add Subscriber'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#718096] hover:bg-[#F9FAFB] transition-colors text-sm font-semibold"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 export const SubscriberManager: React.FC = () => {
   const navigate = useNavigate();
@@ -45,8 +183,9 @@ export const SubscriberManager: React.FC = () => {
   // Multi-select for bulk action
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Bulk Import modal
+  // Modals
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Confirm delete modal
   const [subToDelete, setSubToDelete] = useState<Subscriber | null>(null);
@@ -76,14 +215,24 @@ export const SubscriberManager: React.FC = () => {
     }
   };
 
-  // Helper to check if subscriber is active (handles both string and boolean)
+  const handleAddSubscriber = async (subscriberData: Omit<Subscriber, 'id' | 'dateSubscribed'>) => {
+    try {
+      await createSubscriberApi(subscriberData);
+      showToast('success', 'Subscriber added successfully');
+      // Refresh the list to show the new subscriber
+      await loadSubscribers();
+    } catch (error) {
+      console.error('Error adding subscriber:', error);
+      throw error;
+    }
+  };
+
   const isActiveSubscriber = (sub: Subscriber) => {
     return sub.optInStatus === 'Active' || sub.optInStatus === true;
   };
 
   const handleToggleOptStatus = async (sub: Subscriber) => {
     try {
-      // Convert to boolean: true = Active, false = Opt-out
       const newStatus = isActiveSubscriber(sub) ? false : true;
       await updateSubscriberStatusApi(sub.id, newStatus);
       showToast('success', `Status updated for ${sub.phone}`);
@@ -131,10 +280,11 @@ export const SubscriberManager: React.FC = () => {
     }
 
     const filteredSubs = getFilteredSubscribers();
-    const headers = ['Phone', 'Email', 'Channel', 'Package Interest', 'Status', 'Date Subscribed'];
+    const headers = ['Phone', 'Email', 'Name', 'Channel', 'Package Interest', 'Status', 'Date Subscribed'];
     const rows = filteredSubs.map((s) => [
       s.phone,
       s.email || '',
+      s.name || '',
       s.channel || '',
       `"${s.packageInterest || ''}"`,
       isActiveSubscriber(s) ? 'Active' : 'Opt-out',
@@ -159,11 +309,11 @@ export const SubscriberManager: React.FC = () => {
       const matchesSearch =
         sub.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (sub.email && sub.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (sub.name && sub.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (sub.packageInterest && sub.packageInterest.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesChannel = channelFilter === 'All' || sub.channel === channelFilter;
       
-      // Fix: Handle both string and boolean for status filter
       let matchesStatus = true;
       if (statusFilter === 'Active') {
         matchesStatus = isActiveSubscriber(sub);
@@ -212,18 +362,45 @@ export const SubscriberManager: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2.5">
           <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-2 rounded-lg bg-[#C8102E] hover:bg-[#A00D24] text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
+          >
+            <UserPlus className="w-4 h-4 text-white" /> Add Subscriber
+          </button>
+
+          <button
+            onClick={() => setIsImportOpen(true)}
+            className="px-4 py-2 rounded-lg bg-[#111827] hover:bg-black text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
+          >
+            <Upload className="w-4 h-4 text-white" /> Import CSV
+          </button>
+
+          <button
             onClick={handleExportCsv}
             className="px-4 py-2 rounded-lg border border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#111827] font-semibold text-xs transition-all flex items-center gap-1.5 shadow-xs"
           >
             <Download className="w-4 h-4 text-[#C8102E]" /> Export CSV
           </button>
+        </div>
+      </div>
 
-          <button
-            onClick={() => setIsImportOpen(true)}
-            className="px-4 py-2 rounded-lg bg-[#C8102E] hover:bg-[#A00D24] text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1.5"
-          >
-            <Upload className="w-4 h-4 text-white" /> Bulk CSV Import
-          </button>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <p className="text-2xl font-black text-[#C8102E]">{subscribers.length}</p>
+          <p className="text-xs text-slate-500">Total Subscribers</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <p className="text-2xl font-black text-emerald-600">{subscribers.filter(s => isActiveSubscriber(s)).length}</p>
+          <p className="text-xs text-slate-500">Active Opt-in</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <p className="text-2xl font-black text-rose-600">{subscribers.filter(s => !isActiveSubscriber(s)).length}</p>
+          <p className="text-xs text-slate-500">Opt-out</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <p className="text-2xl font-black text-amber-600">{packages.length}</p>
+          <p className="text-xs text-slate-500">Total Packages</p>
         </div>
       </div>
 
@@ -236,7 +413,7 @@ export const SubscriberManager: React.FC = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by phone number or email..."
+              placeholder="Search by phone, email, or name..."
               className="w-full pl-10 pr-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#1A5B4B]"
             />
           </div>
@@ -264,6 +441,7 @@ export const SubscriberManager: React.FC = () => {
               <option value="All">All Channels</option>
               <option value="WhatsApp">WhatsApp</option>
               <option value="Web Banner">Web Banner</option>
+              <option value="Web Form">Web Form</option>
               <option value="Footer">Footer</option>
               <option value="Direct">Direct</option>
             </select>
@@ -309,6 +487,7 @@ export const SubscriberManager: React.FC = () => {
                   />
                 </th>
                 <th className="p-3.5">Phone Number</th>
+                <th className="p-3.5">Name</th>
                 <th className="p-3.5">Email</th>
                 <th className="p-3.5">Channel</th>
                 <th className="p-3.5">Package Interest</th>
@@ -320,7 +499,7 @@ export const SubscriberManager: React.FC = () => {
             <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
               {paginatedSubscribers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-500">
+                  <td colSpan={9} className="p-8 text-center text-slate-500">
                     No subscribers match the current filter.
                   </td>
                 </tr>
@@ -340,6 +519,10 @@ export const SubscriberManager: React.FC = () => {
                       {sub.phone || 'N/A'}
                     </td>
 
+                    <td className="p-3.5 text-slate-700">
+                      {sub.name || '—'}
+                    </td>
+
                     <td className="p-3.5 text-slate-600">
                       {sub.email || '—'}
                     </td>
@@ -354,7 +537,6 @@ export const SubscriberManager: React.FC = () => {
                       {sub.packageInterest || 'General Offers'}
                     </td>
 
-                    {/* Fixed Status Column - Handles both string and boolean */}
                     <td className="p-3.5">
                       <span
                         className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -449,6 +631,12 @@ export const SubscriberManager: React.FC = () => {
           loadSubscribers();
           return res;
         }}
+      />
+
+      <AddSubscriberModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={handleAddSubscriber}
       />
 
       <ConfirmModal

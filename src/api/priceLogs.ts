@@ -5,7 +5,18 @@ import { PriceLog } from '../types';
 export async function getPriceLogsApi(): Promise<PriceLog[]> {
   try {
     const res = await apiClient.get('/admin/price-logs');
-    return res.data?.data || [];
+    console.log('📥 Price logs raw response:', res.data);
+    
+    // Handle different response formats
+    let data = res.data;
+    if (data && data.data) {
+      data = data.data;
+    }
+    if (Array.isArray(data)) {
+      console.log('✅ Price logs data:', data);
+      return data;
+    }
+    return [];
   } catch (error) {
     console.error('❌ Error fetching price logs:', error);
     return [];

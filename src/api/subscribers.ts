@@ -46,4 +46,15 @@ export async function bulkDeleteSubscribersApi(ids: string[]): Promise<void> {
   }
 }
 
+// ADD THIS FUNCTION - Create a single subscriber
+export async function createSubscriberApi(data: Omit<Subscriber, 'id' | 'dateSubscribed'>): Promise<Subscriber> {
+  try {
+    const res = await apiClient.post('/subscribers', data);
+    return res.data?.data || res.data;
+  } catch (error: any) {
+    console.error('❌ Error creating subscriber:', error);
+    throw new Error(error?.response?.data?.error || 'Failed to create subscriber');
+  }
+}
+
 export const bulkImportSubscribers = bulkImportSubscribersApi;

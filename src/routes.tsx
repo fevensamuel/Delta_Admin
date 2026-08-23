@@ -10,6 +10,7 @@ const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const PackageList = lazy(() => import('./pages/packages/PackageList').then((m) => ({ default: m.PackageList })));
 const PackageFormPage = lazy(() => import('./pages/packages/PackageFormPage').then((m) => ({ default: m.PackageFormPage })));
+const PackagePersons = lazy(() => import('./pages/packages/PackagePersons').then((m) => ({ default: m.PackagePersons })));
 const GalleryGrid = lazy(() => import('./pages/gallery/GalleryGrid').then((m) => ({ default: m.GalleryGrid })));
 const GalleryFormPage = lazy(() => import('./pages/gallery/GalleryFormPage').then((m) => ({ default: m.GalleryFormPage })));
 const BulkUploadPage = lazy(() => import('./pages/gallery/BulkUploadPage').then((m) => ({ default: m.BulkUploadPage })));
@@ -21,7 +22,9 @@ const BookingLeads = lazy(() => import('./pages/leads/BookingLeads').then((m) =>
 // Settings Pages
 const SocialLinks = lazy(() => import('./pages/Settings/SocialLinks').then((m) => ({ default: m.SocialLinks })));
 const Faqs = lazy(() => import('./pages/Settings/Faqs').then((m) => ({ default: m.Faqs })));
-const TeamMembers = lazy(() => import('./pages/Settings/TeamMembers').then((m) => ({ default: m.TeamMembers }))); // ADD THIS LINE
+const TeamMembers = lazy(() => import('./pages/Settings/TeamMembers').then((m) => ({ default: m.TeamMembers })));
+const OfficeImages = lazy(() => import('./pages/Settings/OfficeImages').then((m) => ({ default: m.OfficeImages })));
+const Testimonials = lazy(() => import('./pages/Settings/Testimonials').then((m) => ({ default: m.Testimonials })));
 const PriceLogs = lazy(() => import('./pages/Settings/PriceLogs').then((m) => ({ default: m.PriceLogs })));
 
 // Protected App Layout Wrapper
@@ -94,6 +97,14 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedLayout>
               <PackageFormPage />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/packages/:id/persons"
+          element={
+            <ProtectedLayout>
+              <PackagePersons />
             </ProtectedLayout>
           }
         />
@@ -188,6 +199,22 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedLayout>
               <TeamMembers />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/settings/office-images"
+          element={
+            <ProtectedLayout>
+              <OfficeImages />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/settings/testimonials"
+          element={
+            <ProtectedLayout>
+              <Testimonials />
             </ProtectedLayout>
           }
         />

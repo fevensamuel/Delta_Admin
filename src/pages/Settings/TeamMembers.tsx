@@ -5,6 +5,20 @@ import { TeamMember } from '../../types';
 import { Plus, Trash2, Save, X, Edit, Loader2, Upload, User } from 'lucide-react';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 
+// Helper to get full image URL
+const getFullImageUrl = (path: string): string => {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  const baseWithoutApi = API_BASE_URL.replace(/\/api$/, '');
+  if (path.startsWith('/uploads')) {
+    return `${baseWithoutApi}${path}`;
+  }
+  return `${baseWithoutApi}${path}`;
+};
+
 export const TeamMembers: React.FC = () => {
   const { showToast } = useToast();
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -290,15 +304,19 @@ export const TeamMembers: React.FC = () => {
           <div className="divide-y divide-[#E2E8F0]">
             {members.map((member, index) => {
               const isEditing = editingId === member.id;
+              // Use the helper to get the full image URL
+              const imageUrl = getFullImageUrl(member.imageUrl);
 
               return (
                 <div key={member.id} className="p-4 hover:bg-[#F9FAFB] transition-colors">
                   <div className="flex items-start gap-4">
+                    {/* Image Preview - Fixed with full URL */}
                     <img
-                      src={member.imageUrl}
+                      src={imageUrl}
                       alt={member.name}
                       className="w-16 h-16 rounded-full object-cover border-2 border-[#E2E8F0] flex-shrink-0"
                       onError={(e) => {
+                        console.error('❌ Failed to load image:', imageUrl);
                         (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64x64/cccccc/666666?text=?';
                       }}
                     />
