@@ -67,7 +67,17 @@ export async function updatePackageApi(id: string, data: FormData | Partial<Pack
   try {
     const isFormData = data instanceof FormData;
     
-    console.log(`📤 updatePackageApi - ${isFormData ? 'FormData' : 'JSON'}:`, { id });
+    // If it's JSON and has persons, ensure it's properly formatted
+    if (!isFormData && data.persons) {
+      data.persons = data.persons.map((person: any) => ({
+        id: person.id || `person-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        name: person.name,
+        email: person.email || '',
+        phone: person.phone,
+        age: person.age,
+        gender: person.gender
+      }));
+    }
     
     const config = isFormData 
       ? { headers: { 'Content-Type': 'multipart/form-data' } } 

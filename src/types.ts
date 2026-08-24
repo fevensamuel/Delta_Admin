@@ -265,3 +265,14 @@ export interface Testimonial {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Person {
+  id: string;
+  name: string;
+  email?: string;
+  phone: string; 
+  age?: number;
+  gender?: 'Male' | 'Female' | 'Child';
+  createdAt?: string;
+  updatedAt?: string;
+}

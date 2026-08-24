@@ -35,6 +35,9 @@ export const GalleryFormPage: React.FC = () => {
   const [imageDragActive, setImageDragActive] = useState(false);
   const [videoDragActive, setVideoDragActive] = useState(false);
 
+  // Fix controlled input warning - initialize with empty string
+  const [videoUrlInput, setVideoUrlInput] = useState('');
+
   useEffect(() => {
     if (id) {
       loadExistingItem(id);
@@ -54,6 +57,7 @@ export const GalleryFormPage: React.FC = () => {
         setVideoUrl(found.videoUrl || '');
         if (found.videoUrl && found.videoUrl.startsWith('http')) {
           setVideoSourceType('url');
+          setVideoUrlInput(found.videoUrl);
         }
         setDuration(found.duration || '');
         setLocation(found.location || '');
@@ -106,7 +110,6 @@ export const GalleryFormPage: React.FC = () => {
     };
     
     tempVideo.onerror = () => {
-      // If metadata can't be loaded, let user enter manually
       showToast('info', 'Could not auto-calculate duration. Please enter it manually.');
     };
     
@@ -117,39 +120,45 @@ export const GalleryFormPage: React.FC = () => {
   const calculateVideoDurationFromFile = (file: File) => {
     const objectUrl = URL.createObjectURL(file);
     calculateVideoDurationFromUrl(objectUrl);
-    // Revoke the URL after calculation
     setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
   };
 
-  // Process video file selection from device safely without memory crash
+  // Process video file selection from device safely
   const handleVideoFileSelect = (file: File) => {
     if (!file.type.startsWith('video/')) {
       showToast('error', 'Please select a valid video file (MP4, WEBM, MOV)');
       return;
     }
 
-    // Guard against ridiculously massive files that freeze the browser
     if (file.size > 500 * 1024 * 1024) {
       showToast('error', 'Video file is too large (> 500MB). Please select a smaller video or enter a stream URL.');
       return;
     }
 
-    // Use Blob Object URL instead of readAsDataURL to prevent browser heap crash
     const objectUrl = URL.createObjectURL(file);
     setVideoUrl(objectUrl);
+    setVideoUrlInput(''); // Clear URL input when uploading file
     calculateVideoDurationFromFile(file);
     showToast('success', `Video "${file.name}" loaded from device (${(file.size / (1024 * 1024)).toFixed(1)} MB)`);
   };
 
-  // Handle video URL input change
+  // Handle video URL input change - FIXED controlled input
   const handleVideoUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
+    setVideoUrlInput(val);
     setVideoUrl(val);
     
-    // Auto-calculate duration for direct video URLs
     if (val && (val.match(/\.(mp4|webm|mov|avi)$/i) || val.includes('video'))) {
       calculateVideoDurationFromUrl(val);
     }
+  };
+
+  // Clear video and switch to upload mode
+  const clearVideo = () => {
+    setVideoUrl('');
+    setVideoUrlInput('');
+    setDuration('');
+    setVideoSourceType('upload');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -176,7 +185,7 @@ export const GalleryFormPage: React.FC = () => {
     try {
       let result;
 
-      // For video uploads from device, use FormData
+      // For video uploads from device (blob URL), use FormData
       if (type === 'Video' && videoSourceType === 'upload' && videoUrl && !videoUrl.startsWith('http')) {
         const formData = new FormData();
         formData.append('titleEn', titleEn.trim());
@@ -200,7 +209,7 @@ export const GalleryFormPage: React.FC = () => {
           result = await createGalleryItem(formData);
         }
       } 
-      // For photo uploads from device, use FormData
+      // For photo uploads from device (data URL), use FormData
       else if (type === 'Photo' && imageUrl && imageUrl.startsWith('data:')) {
         const formData = new FormData();
         formData.append('titleEn', titleEn.trim());
@@ -222,20 +231,62 @@ export const GalleryFormPage: React.FC = () => {
           result = await createGalleryItem(formData);
         }
       } 
-      // For video URLs (YouTube, Vimeo, direct MP4 links, etc.) - send as JSON
+      // For video URLs (direct MP4 links) - send as FormData with videoUrl field
+      else if (type === 'Video' && videoSourceType === 'url') {
+        const formData = new FormData();
+        formData.append('titleEn', titleEn.trim());
+        formData.append('titleAr', titleAr.trim() || '');
+        formData.append('type', 'video');
+        formData.append('location', location.trim() || '');
+        formData.append('description', description.trim() || '');
+        formData.append('isActive', String(isActive));
+        formData.append('sortOrder', String(sortOrder));
+        if (duration) formData.append('duration', duration);
+        formData.append('videoUrl', videoUrl); // Send as videoUrl field
+
+        if (id) {
+          result = await updateGalleryItem(id, formData);
+        } else {
+          result = await createGalleryItem(formData);
+        }
+      }
+      // For photo URLs (existing image URL) - send as JSON
+      else if (type === 'Photo' && imageUrl && imageUrl.startsWith('http')) {
+        const payload: any = {
+          type: 'photo',
+          titleEn: titleEn.trim(),
+          titleAr: titleAr.trim() || undefined,
+          location: location.trim() || undefined,
+          description: description.trim() || undefined,
+          isActive,
+          sortOrder: Number(sortOrder) || 1,
+          imageUrl: imageUrl
+        };
+
+        if (id) {
+          result = await updateGalleryItem(id, payload);
+        } else {
+          result = await createGalleryItem(payload);
+        }
+      }
+      // Fallback: send as JSON
       else {
-        const payload: Omit<GalleryItem, 'id' | 'uploadDate'> = {
+        const payload: any = {
           type,
           titleEn: titleEn.trim(),
           titleAr: titleAr.trim() || undefined,
-          imageUrl: type === 'Photo' ? imageUrl : '',
-          videoUrl: type === 'Video' ? videoUrl : '',
-          duration: type === 'Video' ? duration.trim() || '' : '',
           location: location.trim() || undefined,
           description: description.trim() || undefined,
           isActive,
           sortOrder: Number(sortOrder) || 1
         };
+
+        if (type === 'Photo') {
+          payload.imageUrl = imageUrl;
+        } else {
+          payload.videoUrl = videoUrl;
+          if (duration) payload.duration = duration;
+        }
 
         if (id) {
           result = await updateGalleryItem(id, payload);
@@ -296,7 +347,11 @@ export const GalleryFormPage: React.FC = () => {
           <div className="flex items-center gap-4">
             <button
               type="button"
-              onClick={() => setType('Photo')}
+              onClick={() => {
+                setType('Photo');
+                setVideoUrl('');
+                setVideoUrlInput('');
+              }}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
                 type === 'Photo'
                   ? 'bg-[#C8102E] text-white border-[#C8102E] shadow-sm'
@@ -308,7 +363,9 @@ export const GalleryFormPage: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => setType('Video')}
+              onClick={() => {
+                setType('Video');
+              }}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border text-xs font-bold cursor-pointer transition-all ${
                 type === 'Video'
                   ? 'bg-[#111827] text-white border-[#111827] shadow-sm'
@@ -409,7 +466,7 @@ export const GalleryFormPage: React.FC = () => {
           </div>
         )}
 
-        {/* Video Options (Upload from device OR Video Stream URL) */}
+        {/* Video Options */}
         {type === 'Video' && (
           <div className="space-y-4 p-5 rounded-lg bg-[#111827]/5 border border-[#111827]/15">
             <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
@@ -420,7 +477,10 @@ export const GalleryFormPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setVideoSourceType('upload')}
+                  onClick={() => {
+                    setVideoSourceType('upload');
+                    setVideoUrlInput('');
+                  }}
                   className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
                     videoSourceType === 'upload'
                       ? 'bg-[#C8102E] text-white shadow-xs'
@@ -455,7 +515,7 @@ export const GalleryFormPage: React.FC = () => {
                     </span>
                     <button
                       type="button"
-                      onClick={() => { setVideoUrl(''); setDuration(''); }}
+                      onClick={clearVideo}
                       className="text-xs text-[#C8102E] font-bold hover:underline"
                     >
                       Remove Video
@@ -500,7 +560,7 @@ export const GalleryFormPage: React.FC = () => {
                 <div className="relative">
                   <input
                     type="url"
-                    value={videoUrl}
+                    value={videoUrlInput || ''}
                     onChange={handleVideoUrlChange}
                     placeholder="https://www.youtube.com/watch?v=... or direct MP4 link"
                     className="w-full pl-9 pr-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm text-[#111827] bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
@@ -513,7 +573,7 @@ export const GalleryFormPage: React.FC = () => {
               </div>
             )}
 
-            {/* Auto Calculated Video Duration field */}
+            {/* Video Duration field */}
             <div className="flex items-center gap-3 pt-2">
               <div className="flex-1">
                 <label className="block text-xs font-bold text-[#111827] mb-1 flex items-center gap-1.5">

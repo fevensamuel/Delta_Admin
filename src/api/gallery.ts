@@ -78,10 +78,9 @@ export async function getGalleryItem(id: string): Promise<GalleryItem> {
   }
 }
 
-// FIX: Accept both FormData and JSON payload
 export async function createGalleryItem(data: FormData | Omit<GalleryItem, 'id' | 'uploadDate'>): Promise<GalleryItem> {
   try {
-    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+    const isFormData = data instanceof FormData;
     const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
     const res = await apiClient.post('/admin/gallery', data, config);
     const newItem = extractGalleryItem(res.data) || res.data;
@@ -89,14 +88,14 @@ export async function createGalleryItem(data: FormData | Omit<GalleryItem, 'id' 
     return newItem;
   } catch (error: any) {
     console.error('❌ Error creating gallery item:', error);
+    console.error('❌ Error response:', error?.response?.data);
     throw new Error(error?.response?.data?.error || 'Failed to create gallery item');
   }
 }
 
-// FIX: Accept both FormData and JSON payload
 export async function updateGalleryItem(id: string, data: FormData | Partial<GalleryItem>): Promise<GalleryItem> {
   try {
-    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+    const isFormData = data instanceof FormData;
     const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
     const res = await apiClient.put(`/admin/gallery/${id}`, data, config);
     const updatedItem = extractGalleryItem(res.data) || res.data;
@@ -110,6 +109,7 @@ export async function updateGalleryItem(id: string, data: FormData | Partial<Gal
 
 export async function deleteGalleryItem(id: string): Promise<void> {
   try {
+    // Use the correct admin route
     await apiClient.delete(`/admin/gallery/${id}`);
     console.log('✅ Gallery item deleted via API:', id);
   } catch (error: any) {
@@ -118,7 +118,6 @@ export async function deleteGalleryItem(id: string): Promise<void> {
   }
 }
 
-// FIX: Bulk upload with FormData support
 export async function bulkUploadGallery(
   files: FormData | {
     titleEn: string;
