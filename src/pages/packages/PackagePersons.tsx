@@ -1,16 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, PersonPrice } from '../../types';
+import { Package } from '../../types';
 import { getPackagesApi } from '../../api/packages';
 import { useToast } from '../../context/ToastContext';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { Search, Filter, User, Edit, Users, DollarSign, Calendar } from 'lucide-react';
+import { Search, Filter, User, Edit, Users, Mail, Phone, RefreshCw, MapPin, Calendar, UserPlus } from 'lucide-react';
+
+interface PackagePerson {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  age?: number;
+  gender?: 'Male' | 'Female' | 'Child';
+}
 
 export const PackagePersons: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [packages, setPackages] = useState<Package[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPackageId, setSelectedPackageId] = useState<string>('All');
 
@@ -22,39 +32,67 @@ export const PackagePersons: React.FC = () => {
     setIsLoading(true);
     try {
       const data = await getPackagesApi();
-      setPackages(Array.isArray(data) ? data : []);
+      const packageArray = Array.isArray(data) ? data : [];
+      setPackages(packageArray);
+      
+      // Debug: Log packages with persons
+      console.log('📦 Packages loaded:', packageArray.length);
+      packageArray.forEach(pkg => {
+        console.log(`  - ${pkg.titleEn}: ${pkg.persons?.length || 0} persons`);
+        if (pkg.persons && pkg.persons.length > 0) {
+          console.log(`    Persons:`, pkg.persons);
+        }
+      });
     } catch (error) {
       console.error('❌ Error loading packages:', error);
       showToast('error', 'Failed to load packages');
       setPackages([]);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadPackages();
+    showToast('success', 'Persons list refreshed');
+  };
+
   const getAllPersons = () => {
-    const allPersons: (PersonPrice & { packageTitle: string; packageId: string; packageCategory: string })[] = [];
+    const allPersons: (PackagePerson & { packageTitle: string; packageId: string; packageCategory: string })[] = [];
+    
     packages.forEach(pkg => {
-      if (pkg.persons && Array.isArray(pkg.persons)) {
-        pkg.persons.forEach((person: PersonPrice) => {
+      // Check if persons exists and is an array
+      if (pkg.persons && Array.isArray(pkg.persons) && pkg.persons.length > 0) {
+        pkg.persons.forEach((person: any) => {
           allPersons.push({
-            ...person,
-            packageTitle: pkg.titleEn,
+            id: person.id || `person-${Date.now()}-${Math.random()}`,
+            name: person.name || 'Unnamed',
+            email: person.email || '',
+            phone: person.phone || '',
+            age: person.age,
+            gender: person.gender,
+            packageTitle: pkg.titleEn || 'Unknown Package',
             packageId: pkg.id,
-            packageCategory: pkg.category
+            packageCategory: pkg.category || 'Uncategorized'
           });
         });
       }
     });
+    
     return allPersons;
   };
 
   const allPersons = getAllPersons();
 
   const filteredPersons = allPersons.filter((person) => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
-      person.label?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      person.packageTitle?.toLowerCase().includes(searchTerm.toLowerCase());
+      person.name?.toLowerCase().includes(searchLower) ||
+      person.email?.toLowerCase().includes(searchLower) ||
+      person.phone?.includes(searchTerm) ||
+      person.packageTitle?.toLowerCase().includes(searchLower);
     const matchesPackage = selectedPackageId === 'All' || person.packageId === selectedPackageId;
     return matchesSearch && matchesPackage;
   });
@@ -64,19 +102,48 @@ export const PackagePersons: React.FC = () => {
   const totalPages = Math.ceil(filteredPersons.length / pageSize) || 1;
   const paginatedPersons = filteredPersons.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedPackageId]);
+
+  const getGenderColor = (gender?: string) => {
+    if (gender === 'Male') return 'text-blue-600 bg-blue-100';
+    if (gender === 'Female') return 'text-pink-600 bg-pink-100';
+    if (gender === 'Child') return 'text-yellow-600 bg-yellow-100';
+    return 'text-gray-600 bg-gray-100';
+  };
+
   if (isLoading) {
     return <LoadingSpinner text="Loading package persons..." />;
   }
 
   return (
     <div className="space-y-6 animate-in fade-in">
-      <div>
-        <h2 className="text-xl font-extrabold text-[#111827] flex items-center gap-2">
-          <Users className="w-6 h-6 text-[#2D7D6B]" /> Persons on Packages
-        </h2>
-        <p className="text-xs text-[#718096] mt-0.5">
-          View all person categories across packages
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-extrabold text-[#111827] flex items-center gap-2">
+            <Users className="w-6 h-6 text-[#2D7D6B]" /> Persons on Packages
+          </h2>
+          <p className="text-xs text-[#718096] mt-0.5">
+            View all people added to packages
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => navigate('/packages')}
+            className="px-4 py-2.5 rounded-lg bg-[#2D7D6B] hover:bg-[#236355] text-white font-bold text-xs transition-colors flex items-center gap-1.5"
+          >
+            <UserPlus className="w-4 h-4" /> Add Person
+          </button>
+          <button 
+            onClick={handleRefresh} 
+            disabled={isRefreshing}
+            className="px-4 py-2.5 rounded-lg border border-[#E2E8F0] text-[#2D3748] font-bold text-xs hover:bg-[#F9FAFB] transition-colors flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-lg border border-[#E2E8F0] shadow-xs flex flex-wrap items-center justify-between gap-4">
@@ -86,11 +153,8 @@ export const PackagePersons: React.FC = () => {
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Search by category or package name..."
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by name, email, phone, or package..."
               className="w-full pl-10 pr-3.5 py-2 rounded-lg border border-[#E2E8F0] text-xs text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]"
             />
           </div>
@@ -98,38 +162,35 @@ export const PackagePersons: React.FC = () => {
             <Filter className="w-4 h-4 text-[#718096]" />
             <select
               value={selectedPackageId}
-              onChange={(e) => {
-                setSelectedPackageId(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={(e) => setSelectedPackageId(e.target.value)}
               className="px-3 py-2 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#111827] bg-white focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]"
             >
-              <option value="All">All Packages</option>
-              {packages.map((pkg) => (
-                <option key={pkg.id} value={pkg.id}>
-                  {pkg.titleEn}
-                </option>
-              ))}
+              <option value="All">All Packages ({allPersons.length})</option>
+              {packages.map((pkg) => {
+                const personCount = pkg.persons?.length || 0;
+                return (
+                  <option key={pkg.id} value={pkg.id}>
+                    {pkg.titleEn} ({personCount} persons)
+                  </option>
+                );
+              })}
             </select>
           </div>
-          <span className="text-xs text-[#718096]">
-            Total: <span className="font-bold text-[#111827]">{allPersons.length}</span> persons
-          </span>
         </div>
-        <button
-          onClick={() => navigate('/packages')}
-          className="px-4 py-2 rounded-lg bg-[#2D7D6B] hover:bg-[#236355] text-white font-bold text-xs transition-colors flex items-center gap-1.5"
-        >
-          <Edit className="w-4 h-4" /> Manage Packages
-        </button>
+        <div className="text-xs text-[#718096]">
+          Total: <span className="font-bold text-[#111827]">{allPersons.length}</span> persons
+        </div>
       </div>
 
       {allPersons.length === 0 ? (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center text-blue-800">
           <Users className="w-12 h-12 mx-auto text-blue-400 mb-3" />
-          <p className="font-bold">No Person Categories Found</p>
+          <p className="font-bold">No Persons Found</p>
           <p className="text-xs mt-1">
-            Person categories are added when creating packages.
+            No people have been added to any packages yet.
+          </p>
+          <p className="text-xs mt-1 text-blue-600">
+            Go to <button onClick={() => navigate('/packages')} className="underline font-bold">Package Manager</button> and click "Add Person" on any package.
           </p>
         </div>
       ) : (
@@ -138,11 +199,11 @@ export const PackagePersons: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F9FAFB] text-[#111827] font-bold border-b border-[#E2E8F0]">
                 <tr>
-                  <th className="p-3.5 pl-5">Category</th>
-                  <th className="p-3.5">Price (USD)</th>
-                  <th className="p-3.5">Price (ETB)</th>
-                  <th className="p-3.5">Price (SAR)</th>
-                  <th className="p-3.5">Age Range</th>
+                  <th className="p-3.5 pl-5">Name</th>
+                  <th className="p-3.5">Phone</th>
+                  <th className="p-3.5">Email</th>
+                  <th className="p-3.5">Age</th>
+                  <th className="p-3.5">Gender</th>
                   <th className="p-3.5">Package</th>
                   <th className="p-3.5 text-right pr-5">Actions</th>
                 </tr>
@@ -151,40 +212,50 @@ export const PackagePersons: React.FC = () => {
                 {paginatedPersons.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-8 text-center text-[#718096]">
-                      No persons found
+                      No persons found matching your search criteria.
                     </td>
                   </tr>
                 ) : (
-                  paginatedPersons.map((person, index) => (
-                    <tr key={person.id || index} className="hover:bg-[#F9FAFB] transition-colors">
+                  paginatedPersons.map((person) => (
+                    <tr key={person.id} className="hover:bg-[#F9FAFB] transition-colors">
                       <td className="p-3.5 pl-5">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-[#2D7D6B]/10 flex items-center justify-center">
                             <User className="w-4 h-4 text-[#2D7D6B]" />
                           </div>
-                          <div>
-                            <span className="font-bold text-[#111827]">{person.label || 'Unnamed'}</span>
-                            {person.isDefault && (
-                              <span className="ml-2 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[9px] font-bold">Default</span>
-                            )}
-                          </div>
+                          <span className="font-bold text-[#111827]">{person.name}</span>
                         </div>
                       </td>
-                      <td className="p-3.5 font-bold text-[#111827]">${person.priceUsd?.toFixed(2) || '0'}</td>
-                      <td className="p-3.5 font-bold text-[#2D7D6B]">{person.priceEtb?.toLocaleString() || '0'} ETB</td>
-                      <td className="p-3.5 font-bold text-[#C9A84C]">{person.priceSar?.toLocaleString() || '0'} SAR</td>
+                      <td className="p-3.5">
+                        <div className="flex items-center gap-1 text-[#718096]">
+                          <Phone className="w-3 h-3" />
+                          {person.phone || '—'}
+                        </div>
+                      </td>
+                      <td className="p-3.5">
+                        <div className="flex items-center gap-1 text-[#718096]">
+                          <Mail className="w-3 h-3" />
+                          {person.email || '—'}
+                        </div>
+                      </td>
                       <td className="p-3.5 text-[#718096]">
-                        {person.minAge !== undefined && person.maxAge !== undefined 
-                          ? `${person.minAge} - ${person.maxAge} yrs`
-                          : person.minAge !== undefined 
-                            ? `${person.minAge}+ yrs`
-                            : 'All ages'}
+                        {person.age || '—'}
+                      </td>
+                      <td className="p-3.5">
+                        {person.gender ? (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getGenderColor(person.gender)}`}>
+                            {person.gender}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                       <td className="p-3.5">
                         <button
                           onClick={() => navigate(`/packages/${person.packageId}/edit`)}
-                          className="text-[#2D7D6B] hover:underline font-semibold"
+                          className="text-[#2D7D6B] hover:underline font-semibold flex items-center gap-1"
                         >
+                          <MapPin className="w-3 h-3" />
                           {person.packageTitle || 'Unknown'}
                         </button>
                       </td>

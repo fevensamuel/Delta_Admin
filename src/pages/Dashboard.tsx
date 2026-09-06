@@ -100,7 +100,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Row 1: Top Metrics Grid (6 columns) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatsCard
           title="Total Packages"
           value={(stats?.totalPackages ?? 0).toString()}
@@ -136,102 +136,8 @@ export const Dashboard: React.FC = () => {
           trend={{ value: 'Customer forms', isPositive: true }}
           accentColor="gold"
         />
-        <StatsCard
-          title="Exchange Rate"
-          value={`${(rate || 112.11).toFixed(1)} ETB`}
-          icon={DollarSign}
-          trend={{ value: 'Real-time USD/ETB', isPositive: true }}
-          accentColor="green"
-        />
       </div>
-
-      {/* Row 2: Exchange Rate Widget & Package Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section className="bg-white rounded-lg border border-[#E2E8F0] shadow-xs p-6 flex flex-col justify-between space-y-4">
-          <div>
-            <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3 mb-4">
-              <h3 className="font-bold text-base text-[#111827] flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
-                Live USD/ETB Rate
-              </h3>
-              <button
-                type="button"
-                onClick={() => fetchRate()}
-                disabled={isRateLoading}
-                className="p-1.5 rounded-lg border border-[#E2E8F0] text-[#C8102E] hover:bg-rose-50 transition-colors cursor-pointer"
-                title="Refresh Live Exchange Rate"
-              >
-                <RefreshCw className={`w-4 h-4 ${isRateLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-
-            <div className="bg-[#F8FAFC] p-4 rounded-lg border border-[#E2E8F0] text-center space-y-1">
-              <span className="text-xs font-semibold text-[#718096]">Current Commercial Bank Rate</span>
-              <div className="text-3xl font-black text-[#111827]">
-                1 USD = <span className="text-[#C8102E]">{rate.toFixed(2)}</span> ETB
-              </div>
-              {lastUpdated && (
-                <p className="text-[10px] text-[#718096]">
-                  Last synced: {new Date(lastUpdated).toLocaleTimeString()}
-                </p>
-              )}
-            </div>
-
-            <div className="mt-4 space-y-2">
-              <label className="block text-xs font-bold text-[#111827]">Quick Price Converter</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <span className="absolute left-2.5 top-2 text-xs font-bold text-[#718096]">$</span>
-                  <input
-                    type="number"
-                    value={usdCalcInput}
-                    onChange={(e) => setUsdCalcInput(Number(e.target.value))}
-                    className="w-full pl-6 pr-2 py-1.5 rounded border border-[#E2E8F0] text-xs font-bold"
-                  />
-                </div>
-                <div className="flex-1 px-3 py-1.5 rounded bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800 flex items-center justify-between">
-                  <span>ETB:</span>
-                  <span>{(usdCalcInput * rate).toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-[#E2E8F0] text-[11px] text-[#718096] flex items-center justify-between">
-            <span>Source: National Bank / Live API</span>
-            <span className="text-emerald-700 font-bold">● Active Service</span>
-          </div>
-        </section>
-
-        <section className="lg:col-span-2 bg-white rounded-lg border border-[#E2E8F0] shadow-xs p-6 flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="font-bold text-base text-[#111827]">Package Performance (WhatsApp Clicks)</h3>
-              <p className="text-xs text-[#718096]">Lead generation volume by category</p>
-            </div>
-            <button
-              onClick={() => navigate('/leads')}
-              className="text-xs font-bold text-[#C8102E] hover:underline flex items-center gap-1"
-            >
-              Leads Analytics <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats?.clicksByCategory || []}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis dataKey="category" stroke="#718096" fontSize={11} tickLine={false} />
-                <YAxis stroke="#718096" fontSize={11} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#111827', borderRadius: '8px', border: 'none', color: '#fff', fontSize: '12px' }}
-                />
-                <Bar dataKey="clicks" fill="#2D7D6B" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
-      </div>
+     
 
       {/* Row 3: Recent Gallery Uploads & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

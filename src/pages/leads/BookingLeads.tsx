@@ -73,6 +73,41 @@ export const BookingLeads: React.FC = () => {
 
   const COLORS = ['#1A5B4B', '#C9A84C', '#3b82f6', '#8b5cf6', '#ec4899'];
 
+  // Calculate actual percentage for top category
+  const getTopCategoryPercentage = () => {
+    if (categoryPieData.length === 0 || totalClicks === 0) return 0;
+    const sorted = [...categoryPieData].sort((a, b) => b.value - a.value);
+    return Math.round((sorted[0]?.value || 0) / totalClicks * 100);
+  };
+
+  // Calculate trend vs last month (simplified - using available data)
+  const getTrendData = () => {
+    // Sort packages by createdAt to get latest
+    const sortedByDate = [...packagesArray].sort((a, b) => 
+      new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    );
+    
+    // Split into two halves: older and newer
+    const midPoint = Math.floor(sortedByDate.length / 2);
+    const olderPackages = sortedByDate.slice(0, midPoint);
+    const newerPackages = sortedByDate.slice(midPoint);
+    
+    const olderClicks = olderPackages.reduce((acc, p) => acc + (p.whatsappClicks || 0), 0);
+    const newerClicks = newerPackages.reduce((acc, p) => acc + (p.whatsappClicks || 0), 0);
+    
+    if (olderClicks === 0 && newerClicks === 0) return { value: 0, isPositive: true, display: 'No data yet' };
+    if (olderClicks === 0) return { value: 100, isPositive: true, display: '+100% vs previous' };
+    
+    const percentageChange = ((newerClicks - olderClicks) / olderClicks) * 100;
+    return {
+      value: Math.abs(Math.round(percentageChange)),
+      isPositive: percentageChange >= 0,
+      display: `${percentageChange >= 0 ? '+' : ''}${Math.round(percentageChange)}% vs previous`
+    };
+  };
+
+  const trendData = getTrendData();
+
   const handleExportCsvReport = () => {
     if (packagesArray.length === 0) {
       showToast('info', 'No data to export');
@@ -145,21 +180,24 @@ export const BookingLeads: React.FC = () => {
         </p>
       </div>
 
-      {/* Key Metrics */}
+      {/* Key Metrics - With Actual Data */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatsCard
           title="Total WhatsApp Clicks"
           value={totalClicks}
           icon={MousePointerClick}
           subtitle="Overall booking leads"
-          trend={{ value: '+18% vs last month', isPositive: true }}
+          trend={{ 
+            value: trendData.display, 
+            isPositive: trendData.isPositive 
+          }}
           accentColor="emerald"
         />
         <StatsCard
           title="Top Package Lead"
-          value={topPackage ? topPackage.titleEn.substring(0, 16) + '...' : '—'}
+          value={topPackage ? topPackage.titleEn : '—'}
           icon={Award}
-          subtitle={`${topPackage?.whatsappClicks || 0} direct inquiries`}
+          subtitle={topPackage ? `${topPackage.whatsappClicks || 0} direct inquiries` : 'No data'}
           accentColor="amber"
         />
         <StatsCard
@@ -167,15 +205,14 @@ export const BookingLeads: React.FC = () => {
           value={categoryPieData.length > 0 ? 
             categoryPieData.sort((a, b) => b.value - a.value)[0]?.name || 'N/A' : 'N/A'}
           icon={TrendingUp}
-          subtitle={`${categoryPieData.length > 0 ? 
-            Math.round((categoryPieData.sort((a, b) => b.value - a.value)[0]?.value / totalClicks) * 100) : 0}% of total intent`}
+          subtitle={`${getTopCategoryPercentage()}% of total intent`}
           accentColor="sky"
         />
         <StatsCard
           title="Avg Package Price"
           value={`$${Math.round(avgPrice)}`}
           icon={DollarSign}
-          subtitle={`≈ ${Math.round(avgPrice * rate)} ETB`}
+          subtitle={`≈ ${Math.round(avgPrice * rate).toLocaleString()} ETB`}
           accentColor="purple"
         />
       </div>

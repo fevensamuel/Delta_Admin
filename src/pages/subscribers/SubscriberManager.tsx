@@ -260,12 +260,14 @@ export const SubscriberManager: React.FC = () => {
   const handleBulkDeleteConfirm = async () => {
     setIsDeleting(true);
     try {
+      // ✅ FIX: Properly send the array of IDs to the API
       await bulkDeleteSubscribersApi(selectedIds);
       showToast('success', `Deleted ${selectedIds.length} subscribers`);
       setSelectedIds([]);
       setIsBulkDeleteModalOpen(false);
       loadSubscribers();
-    } catch {
+    } catch (error) {
+      console.error('Bulk delete error:', error);
       showToast('error', 'Failed to bulk delete subscribers');
     } finally {
       setIsDeleting(false);

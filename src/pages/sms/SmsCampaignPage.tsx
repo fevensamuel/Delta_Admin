@@ -16,7 +16,8 @@ import {
   AlertTriangle,
   History,
   FileSpreadsheet,
-  Package as PackageIcon
+  Package as PackageIcon,
+  User
 } from 'lucide-react';
 
 export const SmsCampaignPage: React.FC = () => {
@@ -31,6 +32,8 @@ export const SmsCampaignPage: React.FC = () => {
   // Campaign Composer State
   const [campaignName, setCampaignName] = useState('Ramadan Umrah Special Promotion 2026');
   const [targetFilter, setTargetFilter] = useState('Active Opt-in');
+  const [recipientType, setRecipientType] = useState<'subscribers' | 'persons'>('subscribers');
+  const [selectedPackageId, setSelectedPackageId] = useState<string>('');
   const [manualNumbers, setManualNumbers] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
   const [message, setMessage] = useState(
@@ -68,13 +71,11 @@ export const SmsCampaignPage: React.FC = () => {
         getPackagesApi()
       ]);
       
-      // Ensure campaigns is always an array
       const campaignData = Array.isArray(cData) ? cData : [];
       const subscriberData = Array.isArray(sData) ? sData : [];
       const packageData = Array.isArray(pData) ? pData : [];
       
       setCampaigns(campaignData);
-      // Fix: Filter subscribers where optInStatus is 'Active' or true
       setSubscribers(subscriberData);
       setPackages(packageData);
     } catch (error) {
@@ -103,8 +104,42 @@ export const SmsCampaignPage: React.FC = () => {
     });
   };
 
-  // Recipient Calculation - FIXED
+  // Get persons from a specific package
+  const getPersonsForPackage = (pkgId: string) => {
+    const pkg = packages.find(p => p.id === pkgId);
+    if (!pkg || !pkg.persons) return [];
+    return pkg.persons.filter(p => p.phone);
+  };
+
+  // Get all persons from all packages
+  const getAllPersons = () => {
+    const allPersons: any[] = [];
+    packages.forEach(pkg => {
+      if (pkg.persons && Array.isArray(pkg.persons)) {
+        pkg.persons.forEach((person: any) => {
+          if (person.phone) {
+            allPersons.push({
+              ...person,
+              packageTitle: pkg.titleEn,
+              packageId: pkg.id
+            });
+          }
+        });
+      }
+    });
+    return allPersons;
+  };
+
+  // Recipient Calculation
   const getEstimatedRecipients = () => {
+    if (recipientType === 'persons') {
+      if (selectedPackageId) {
+        return getPersonsForPackage(selectedPackageId).length;
+      }
+      return getAllPersons().length;
+    }
+
+    // Subscribers
     if (targetFilter === 'All Subscribers') {
       return subscribers.length;
     }
@@ -125,11 +160,10 @@ export const SmsCampaignPage: React.FC = () => {
   };
 
   const estimatedRecipientsCount = getEstimatedRecipients();
-
-  // Get active subscribers count
   const activeSubscribersCount = subscribers.filter(s => isActiveSubscriber(s)).length;
+  const allPersonsCount = getAllPersons().length;
 
-  // SMS length calculation (160 standard chars = 1 SMS segment)
+  // SMS length calculation
   const charLength = message.length;
   const smsSegments = Math.ceil(charLength / 160) || 1;
   const isOverTwilioLimit = charLength > 1600;
@@ -146,12 +180,21 @@ export const SmsCampaignPage: React.FC = () => {
 
     setIsSending(true);
     try {
-      const newCmp = await sendSmsCampaignApi({
+      const payload: any = {
         name: campaignName,
-        targetFilter,
-        message
-      });
-      showToast('success', `Campaign "${newCmp.name}" sent to ${newCmp.recipientsCount} subscribers!`);
+        message,
+        recipientType: recipientType
+      };
+
+      if (recipientType === 'persons') {
+        payload.packageId = selectedPackageId || undefined;
+        payload.targetFilter = selectedPackageId ? 'Package-specific' : 'All Persons';
+      } else {
+        payload.targetFilter = targetFilter;
+      }
+
+      const newCmp = await sendSmsCampaignApi(payload);
+      showToast('success', `Campaign "${newCmp.name}" sent to ${newCmp.recipientsCount} recipients!`);
       setIsSendConfirmOpen(false);
       setMessage('');
       loadData();
@@ -197,11 +240,11 @@ export const SmsCampaignPage: React.FC = () => {
           <p className="text-xs text-slate-500">Active Opt-in</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <p className="text-2xl font-black text-amber-600">{packages.length}</p>
-          <p className="text-xs text-slate-500">Total Packages</p>
+          <p className="text-2xl font-black text-blue-600">{allPersonsCount}</p>
+          <p className="text-xs text-slate-500">Persons on Package</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <p className="text-2xl font-black text-blue-600">{campaigns.length}</p>
+          <p className="text-2xl font-black text-amber-600">{campaigns.length}</p>
           <p className="text-xs text-slate-500">Campaigns Sent</p>
         </div>
       </div>
@@ -226,58 +269,115 @@ export const SmsCampaignPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Recipient Selection Filter *</label>
-              <select
-                value={targetFilter}
-                onChange={(e) => setTargetFilter(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-[#1A5B4B]"
+          {/* Recipient Type Selector - NEW */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Recipient Type *</label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setRecipientType('subscribers')}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                  recipientType === 'subscribers'
+                    ? 'bg-[#1A5B4B] text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
               >
-                <option value="Active Opt-in">Active Opt-in Subscribers ({activeSubscribersCount})</option>
-                <option value="All Subscribers">All Subscribers ({subscribers.length})</option>
-                
-                <optgroup label="📦 Package Specific Subscribers">
-                  {packages.map((pkg) => {
-                    const count = getSubscribersForPackage(pkg.titleEn).length;
-                    return (
-                      <option key={pkg.id} value={`Package: ${pkg.titleEn}`}>
-                        {pkg.titleEn} ({count} subscriber{count !== 1 ? 's' : ''})
-                      </option>
-                    );
-                  })}
-                </optgroup>
-
-                <optgroup label="⚙️ Other Recipient Filters">
-                  <option value="Package-specific">All Package Leads ({subscribers.filter(s => s.packageInterest).length})</option>
-                  <option value="Manual Numbers">Manual Numbers Input</option>
-                </optgroup>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Schedule Dispatch (Optional)</label>
-              <input
-                type="datetime-local"
-                value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm text-slate-800 focus:ring-2 focus:ring-[#C8102E]"
-              />
+                <Users className="w-4 h-4" /> SMS Subscribers
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecipientType('persons')}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                  recipientType === 'persons'
+                    ? 'bg-[#1A5B4B] text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <User className="w-4 h-4" /> Persons on Package
+              </button>
             </div>
           </div>
 
-          {targetFilter === 'Manual Numbers' && (
+          {recipientType === 'persons' ? (
+            // Persons on Package Selection
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Manual Phone Numbers (comma or newline separated)</label>
-              <textarea
-                rows={3}
-                value={manualNumbers}
-                onChange={(e) => setManualNumbers(e.target.value)}
-                placeholder="+251911223344, +251922334455"
-                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C8102E]"
-              />
+              <label className="block text-xs font-bold text-slate-700 mb-1">Select Package</label>
+              <select
+                value={selectedPackageId}
+                onChange={(e) => setSelectedPackageId(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-[#1A5B4B]"
+              >
+                <option value="">All Packages ({allPersonsCount} persons)</option>
+                {packages.map((pkg) => {
+                  const count = pkg.persons?.filter(p => p.phone).length || 0;
+                  return (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.titleEn} ({count} person{count !== 1 ? 's' : ''})
+                    </option>
+                  );
+                })}
+              </select>
+              {selectedPackageId && (
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Sending to persons in: {packages.find(p => p.id === selectedPackageId)?.titleEn}
+                </p>
+              )}
+            </div>
+          ) : (
+            // Subscribers Selection (existing)
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Recipient Selection Filter *</label>
+                <select
+                  value={targetFilter}
+                  onChange={(e) => setTargetFilter(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-[#1A5B4B]"
+                >
+                  <option value="Active Opt-in">Active Opt-in Subscribers ({activeSubscribersCount})</option>
+                  <option value="All Subscribers">All Subscribers ({subscribers.length})</option>
+                  
+                  <optgroup label="📦 Package Specific Subscribers">
+                    {packages.map((pkg) => {
+                      const count = getSubscribersForPackage(pkg.titleEn).length;
+                      return (
+                        <option key={pkg.id} value={`Package: ${pkg.titleEn}`}>
+                          {pkg.titleEn} ({count} subscriber{count !== 1 ? 's' : ''})
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+
+                  <optgroup label="⚙️ Other Recipient Filters">
+                    <option value="Package-specific">All Package Leads ({subscribers.filter(s => s.packageInterest).length})</option>
+                    <option value="Manual Numbers">Manual Numbers Input</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              {targetFilter === 'Manual Numbers' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Manual Phone Numbers (comma or newline separated)</label>
+                  <textarea
+                    rows={3}
+                    value={manualNumbers}
+                    onChange={(e) => setManualNumbers(e.target.value)}
+                    placeholder="+251911223344, +251922334455"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-[#C8102E]"
+                  />
+                </div>
+              )}
             </div>
           )}
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Schedule Dispatch (Optional)</label>
+            <input
+              type="datetime-local"
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
+              className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm text-slate-800 focus:ring-2 focus:ring-[#C8102E]"
+            />
+          </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -306,7 +406,7 @@ export const SmsCampaignPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <Users className="w-4 h-4 text-[#1A5B4B]" />
-              <span>Targeting <strong>{estimatedRecipientsCount}</strong> active contacts</span>
+              <span>Targeting <strong>{estimatedRecipientsCount}</strong> {recipientType === 'persons' ? 'persons' : 'contacts'}</span>
             </div>
 
             <div className="flex items-center gap-3">
@@ -434,8 +534,8 @@ export const SmsCampaignPage: React.FC = () => {
       <ConfirmModal
         isOpen={isSendConfirmOpen}
         title="Confirm SMS Campaign Broadcast?"
-        message={`Are you sure you want to broadcast this message to ${estimatedRecipientsCount} subscribers?`}
-        confirmLabel={`Send to ${estimatedRecipientsCount} Contacts`}
+        message={`Are you sure you want to broadcast this message to ${estimatedRecipientsCount} ${recipientType === 'persons' ? 'persons' : 'subscribers'}?`}
+        confirmLabel={`Send to ${estimatedRecipientsCount} ${recipientType === 'persons' ? 'Persons' : 'Contacts'}`}
         onConfirm={handleDispatchCampaign}
         onCancel={() => setIsSendConfirmOpen(false)}
         isLoading={isSending}

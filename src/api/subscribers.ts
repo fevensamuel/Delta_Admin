@@ -1,10 +1,10 @@
+// src/api/subscribers.ts
 import { apiClient } from './client';
 import { Subscriber } from '../types';
 
 export async function getSubscribersApi(): Promise<Subscriber[]> {
   try {
     const res = await apiClient.get('/admin/subscribers');
-    // The backend returns { status, success, count, data: [...] }
     return res.data?.data || [];
   } catch (error) {
     console.error('Error fetching subscribers:', error);
@@ -15,7 +15,7 @@ export async function getSubscribersApi(): Promise<Subscriber[]> {
 export async function bulkImportSubscribersApi(subscribers: Omit<Subscriber, 'id' | 'dateSubscribed'>[]): Promise<{ added: number; updated: number }> {
   try {
     const res = await apiClient.post('/admin/subscribers/bulk', { subscribers });
-    return res.data;
+    return res.data?.data || res.data;
   } catch (error) {
     throw new Error((error as Error)?.message || 'Failed to bulk import subscribers');
   }
@@ -30,6 +30,7 @@ export async function updateSubscriberStatusApi(id: string, optInStatus: boolean
   }
 }
 
+// DELETE single subscriber
 export async function deleteSubscriberApi(id: string): Promise<void> {
   try {
     await apiClient.delete(`/admin/subscribers/${id}`);
@@ -38,18 +39,19 @@ export async function deleteSubscriberApi(id: string): Promise<void> {
   }
 }
 
+// BULK DELETE subscribers - FIXED
 export async function bulkDeleteSubscribersApi(ids: string[]): Promise<void> {
   try {
+    // Using data: { ids } to send in request body
     await apiClient.delete('/admin/subscribers/bulk-delete', { data: { ids } });
   } catch (error) {
     throw new Error((error as Error)?.message || 'Failed to bulk delete subscribers');
   }
 }
 
-// ADD THIS FUNCTION - Create a single subscriber
 export async function createSubscriberApi(data: Omit<Subscriber, 'id' | 'dateSubscribed'>): Promise<Subscriber> {
   try {
-    const res = await apiClient.post('/subscribers', data);
+    const res = await apiClient.post('/admin/subscribers', data);
     return res.data?.data || res.data;
   } catch (error: any) {
     console.error('❌ Error creating subscriber:', error);
