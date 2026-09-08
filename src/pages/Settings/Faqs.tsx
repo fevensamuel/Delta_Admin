@@ -4,6 +4,7 @@ import { getFaqsApi, createFaqApi, updateFaqApi, deleteFaqApi } from '../../api/
 import { FAQItem } from '../../types';
 import { Plus, Trash2, Save, X, Edit, Loader2 } from 'lucide-react';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
 export const Faqs: React.FC = () => {
   const { showToast } = useToast();
@@ -100,7 +101,7 @@ export const Faqs: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[#C8102E]" />
+        <LoadingSpinner text="Loading FAQs..." />
       </div>
     );
   }

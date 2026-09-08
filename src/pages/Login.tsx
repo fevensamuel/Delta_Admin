@@ -35,15 +35,27 @@ export const Login: React.FC = () => {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#C8102E]/[0.03] rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-md w-full relative z-10">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-[#C8102E] flex items-center justify-center text-white mx-auto shadow-xl shadow-[#C8102E]/30 mb-3 border border-[#FC8181]/30">
-            <Compass className="w-9 h-9" />
-          </div>
-          <h1 className="text-2xl font-black tracking-wider text-white">DELTA TRAVEL & TOUR</h1>
-          <p className="text-xs font-semibold text-[#FC8181] tracking-widest uppercase mt-1 border-b border-[#FC8181]/20 pb-1 inline-block">
-            Admin Management Portal
-          </p>
-        </div>
+  <div className="text-center mb-8">
+    {/* Logo with glowing effect */}
+    <div className="relative w-20 h-20 mx-auto mb-3">
+      {/* Glow ring */}
+      <div className="absolute inset-0 rounded-2xl bg-[#C8102E] blur-xl opacity-50 animate-pulse" />
+      <div className="relative w-full h-full rounded-2xl overflow-hidden bg-white shadow-xl shadow-[#C8102E]/30 border-2 border-[#C8102E]/30 flex items-center justify-center">
+        <img 
+          src="/logo/logo.jpg" 
+          alt="Delta Travel & Tour" 
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"%3E%3Crect width="80" height="80" fill="%23C8102E" rx="16"/%3E%3Ctext x="40" y="48" text-anchor="middle" dy=".3em" fill="white" font-size="32" font-family="sans-serif" font-weight="bold"%3EΔ%3C/text%3E%3C/svg%3E';
+          }}
+        />
+      </div>
+    </div>
+    <h1 className="text-2xl font-black tracking-wider text-white">DELTA TRAVEL & TOUR</h1>
+    <p className="text-xs font-semibold text-[#FC8181] tracking-widest uppercase mt-1 border-b border-[#FC8181]/20 pb-1 inline-block">
+      Admin Management Portal
+    </p>
+  </div>
 
         <div className="bg-white rounded-3xl shadow-2xl p-8 border border-[#E2E8F0] shadow-black/30">
           <div className="mb-6">

@@ -67,15 +67,21 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             >
               {cancelLabel}
             </button>
-            <button
-              type="button"
-              onClick={onConfirm}
-              disabled={isLoading}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all ${btnBg} disabled:opacity-50 flex items-center gap-2`}
-            >
-              {isLoading && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-              {confirmLabel}
-            </button>
+          <button
+  type="button"
+  onClick={onConfirm}
+  disabled={isLoading}
+  className={`px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all ${btnBg} disabled:opacity-50 flex items-center gap-2`}
+>
+  {isLoading && (
+    <img 
+      src="/logo/logo.jpg" 
+      alt="Loading..." 
+      className="w-5 h-5 rounded-full object-cover animate-pulse"
+    />
+  )}
+  {confirmLabel}
+</button>
           </div>
         </div>
       </div>

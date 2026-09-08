@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { getPriceLogsApi } from '../../api/priceLogs';
 import { PriceLog } from '../../types';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { Loader2, History, TrendingUp, TrendingDown, Minus, Calendar, Package as PackageIcon, User, RefreshCw } from 'lucide-react';
 
 export const PriceLogs: React.FC = () => {
@@ -76,13 +77,11 @@ export const PriceLogs: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[#C8102E]" />
-      </div>
-    );
-  }
+   if (loading) {
+      return (
+        <LoadingSpinner text="Loading Price Logs..." />
+      );
+    }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">

@@ -4,6 +4,7 @@ import { getTeamMembersApi, createTeamMemberApi, updateTeamMemberApi, deleteTeam
 import { TeamMember } from '../../types';
 import { Plus, Trash2, Save, X, Edit, Loader2, Upload, User } from 'lucide-react';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
 // Helper to get full image URL
 const getFullImageUrl = (path: string): string => {
@@ -186,9 +187,7 @@ export const TeamMembers: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[#C8102E]" />
-      </div>
+      <LoadingSpinner text="Loading Team Members..." />
     );
   }
 

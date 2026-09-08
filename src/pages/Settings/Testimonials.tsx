@@ -4,6 +4,7 @@ import { getTestimonialsApi, createTestimonialApi, updateTestimonialApi, deleteT
 import { Testimonial } from '../../types';
 import { Plus, Trash2, Save, X, Edit, Loader2, Star, User, Quote } from 'lucide-react';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
 export const Testimonials: React.FC = () => {
   const { showToast } = useToast();
@@ -103,12 +104,10 @@ export const Testimonials: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[#C8102E]" />
-      </div>
-    );
-  }
+        return (
+          <LoadingSpinner text="Loading Testimonials..." />
+        );
+      }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">

@@ -96,16 +96,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         }`}
       >
         {/* Brand Header */}
-        <div className="p-6 border-b border-[#ffffff15] flex items-center justify-between bg-[#111827]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#C8102E] rounded-lg flex items-center justify-center shadow-lg text-white">
-              <Compass className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-white font-extrabold leading-tight tracking-wide text-base">DELTA TRAVEL</h1>
-              <p className="text-[#FC8181] text-[10px] tracking-widest uppercase font-bold">& TOUR • ADMIN</p>
-            </div>
-          </div>
+      <div className="p-6 border-b border-[#ffffff15] flex items-center justify-between bg-[#111827]">
+  <div className="flex items-center gap-3">
+    {/* Logo with glowing effect - matching the login page */}
+    <div className="relative w-10 h-10 flex-shrink-0">
+      {/* Glow ring */}
+      <div className="absolute inset-0 rounded-lg bg-[#C8102E] blur-md opacity-50 animate-pulse" />
+      <div className="relative w-full h-full rounded-lg overflow-hidden bg-white shadow-lg shadow-[#C8102E]/30 border-2 border-[#C8102E]/30 flex items-center justify-center">
+        <img 
+          src="/logo/logo.jpg" 
+          alt="Delta Travel" 
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"%3E%3Crect width="40" height="40" fill="%23C8102E" rx="8"/%3E%3Ctext x="20" y="26" text-anchor="middle" dy=".3em" fill="white" font-size="18" font-family="sans-serif" font-weight="bold"%3EΔ%3C/text%3E%3C/svg%3E';
+          }}
+        />
+      </div>
+    </div>
+    <div>
+      <h1 className="text-white font-extrabold leading-tight tracking-wide text-base">DELTA TRAVEL</h1>
+      <p className="text-[#FC8181] text-[10px] tracking-widest uppercase font-bold">& TOUR • ADMIN</p>
+    </div>
+  </div>
           <button
             onClick={onClose}
             className="lg:hidden text-white/60 hover:text-white p-1 rounded-lg hover:bg-white/10"

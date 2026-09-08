@@ -1,5 +1,4 @@
 import React from 'react';
-import { Plane } from 'lucide-react';
 
 interface LoadingSpinnerProps {
   text?: string;
@@ -8,26 +7,38 @@ interface LoadingSpinnerProps {
 export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ text = 'Loading Delta Travel...' }) => {
   return (
     <div className="min-h-[350px] w-full flex flex-col items-center justify-center p-8 space-y-4 text-center">
-      {/* Delta Travel Branded Logo Container */}
+      {/* Delta Travel Logo with Animation */}
       <div className="relative flex items-center justify-center">
         {/* Outer glowing pulsing ring */}
-        <div className="absolute w-20 h-20 rounded-full border-2 border-[#C9A84C]/40 animate-ping" />
-        <div className="absolute w-16 h-16 rounded-full border-2 border-t-[#2D7D6B] border-r-transparent border-b-[#C8102E] border-l-transparent animate-spin" />
+        <div className="absolute w-24 h-24 rounded-full border-2 border-[#C8102E]/30 animate-ping" />
         
-        {/* Brand Shield / Logo Emblem */}
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#111827] via-[#1F2937] to-[#2D7D6B] p-0.5 shadow-xl flex items-center justify-center z-10">
-          <div className="w-full h-full bg-[#111827] rounded-[14px] flex flex-col items-center justify-center relative overflow-hidden">
-            {/* Gold Accent Strip */}
-            <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-[#2D7D6B] via-[#C9A84C] to-[#C8102E]" />
-            <Plane className="w-6 h-6 text-[#C9A84C] -rotate-45 transform animate-bounce" />
-            <span className="text-[8px] font-black tracking-widest text-white mt-0.5 uppercase">DELTA</span>
-          </div>
+        {/* Spinning ring */}
+        <div className="absolute w-20 h-20 rounded-full border-4 border-t-[#C8102E] border-r-transparent border-b-[#C8102E]/40 border-l-transparent animate-spin" />
+        
+        {/* Logo Image */}
+        <div className="w-16 h-16 rounded-full bg-white p-1 shadow-xl z-10 border-2 border-[#C8102E]/20">
+          <img 
+            src="/logo/logo.jpg" 
+            alt="Delta Travel & Tour" 
+            className="w-full h-full rounded-full object-cover"
+            onError={(e) => {
+              // Fallback if logo fails to load
+              (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" fill="%23C8102E" rx="32"/%3E%3Ctext x="32" y="40" text-anchor="middle" dy=".3em" fill="white" font-size="28" font-family="sans-serif" font-weight="bold"%3EΔ%3C/text%3E%3C/svg%3E';
+            }}
+          />
         </div>
       </div>
 
       <div className="space-y-1">
         <h4 className="text-xs font-black text-[#111827] tracking-wider uppercase">Delta Travel</h4>
         <p className="text-[11px] font-semibold text-[#718096]">{text}</p>
+        
+        {/* Loading dots animation */}
+        <div className="flex items-center justify-center gap-1 pt-1">
+          <span className="w-1.5 h-1.5 bg-[#C8102E] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-1.5 h-1.5 bg-[#C8102E] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-1.5 h-1.5 bg-[#C8102E] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
       </div>
     </div>
   );

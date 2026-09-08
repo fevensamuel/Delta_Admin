@@ -4,6 +4,7 @@ import { getSocialLinksApi, createSocialLinkApi, updateSocialLinkApi, deleteSoci
 import { SocialLink } from '../../types';
 import { Edit, Plus, Trash2, X, Check, Loader2 } from 'lucide-react';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
 export const SocialLinks: React.FC = () => {
   const { showToast } = useToast();
@@ -88,7 +89,7 @@ export const SocialLinks: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-[#C8102E]" /></div>;
+    return <LoadingSpinner text="Loading Social Links..." />;
   }
 
   return (

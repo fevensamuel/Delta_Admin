@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Package } from '../../types';
 import { getPackagesApi, deletePackageApi, updatePackageApi } from '../../api/packages';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { Pagination } from '../../components/common/Pagination';
 import { useToast } from '../../context/ToastContext';
 import { useDebounce } from '../../hooks/useDebounce';
+
 import { 
   Plus, Search, Filter, Edit, Trash2, Archive, MessageSquare, 
   Package as PackageIcon, RefreshCw, Users, UserPlus, User, X
@@ -251,11 +253,8 @@ export const PackageList: React.FC = () => {
   const paginatedPackages = filteredPackages.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center py-12">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C8102E]"></div>
-      <span className="ml-2 text-sm text-[#718096]">Loading packages...</span>
-    </div>;
-  }
+      return <LoadingSpinner text="Loading Packages..." />;
+    }
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in">

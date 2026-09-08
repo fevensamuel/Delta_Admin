@@ -4,6 +4,7 @@ import { getOfficeImagesApi, createOfficeImageApi, updateOfficeImageApi, deleteO
 import { OfficeImage } from '../../types';
 import { Plus, Trash2, Save, X, Edit, Loader2, Image as ImageIcon, Upload } from 'lucide-react';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
 // Helper function to get full image URL
 const getFullImageUrl = (path: string): string => {
@@ -156,13 +157,11 @@ export const OfficeImages: React.FC = () => {
     showToast('success', 'Order updated successfully');
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-[#C8102E]" />
-      </div>
-    );
-  }
+   if (loading) {
+      return (
+        <LoadingSpinner text="Loading Office Images..." />
+      );
+    }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
