@@ -43,7 +43,7 @@ const AddSubscriberModal: React.FC<AddSubscriberModalProps> = ({ isOpen, onClose
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [channel, setChannel] = useState('Web Form');
+  const [channel, setChannel] = useState('Social Media');
   const [packageInterest, setPackageInterest] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -69,7 +69,7 @@ const AddSubscriberModal: React.FC<AddSubscriberModalProps> = ({ isOpen, onClose
       setPhone('');
       setEmail('');
       setName('');
-      setChannel('Web Form');
+      setChannel('Social Media');
       setPackageInterest('');
       onClose();
     } catch (error) {
@@ -127,10 +127,10 @@ const AddSubscriberModal: React.FC<AddSubscriberModalProps> = ({ isOpen, onClose
               onChange={(e) => setChannel(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E]"
             >
-              <option value="Web Form">Web Form</option>
+              <option value="Social Media">Social Media</option>
               <option value="WhatsApp">WhatsApp</option>
-              <option value="Footer">Footer</option>
               <option value="Direct">Direct</option>
+              <option value="Others">Others</option>
               <option value="Bulk Import">Bulk Import</option>
             </select>
           </div>
@@ -260,7 +260,6 @@ export const SubscriberManager: React.FC = () => {
   const handleBulkDeleteConfirm = async () => {
     setIsDeleting(true);
     try {
-      // ✅ FIX: Properly send the array of IDs to the API
       await bulkDeleteSubscribersApi(selectedIds);
       showToast('success', `Deleted ${selectedIds.length} subscribers`);
       setSelectedIds([]);
@@ -441,11 +440,12 @@ export const SubscriberManager: React.FC = () => {
               className="px-3 py-2 rounded-xl border border-slate-300 text-xs font-semibold bg-white"
             >
               <option value="All">All Channels</option>
-              <option value="WhatsApp">WhatsApp</option>
               <option value="Web Banner">Web Banner</option>
-              <option value="Web Form">Web Form</option>
-              <option value="Footer">Footer</option>
+              <option value="Social Media">Social Media</option>
+              <option value="WhatsApp">WhatsApp</option>
               <option value="Direct">Direct</option>
+              <option value="Others">Others</option>
+              <option value="Bulk Import">Bulk Import</option>
             </select>
 
             <select
