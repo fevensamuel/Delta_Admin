@@ -43,31 +43,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (usernameOrEmail: string, password: string) => {
-    try {
-      console.log('📤 Attempting login for:', usernameOrEmail);
-      const res = await loginApi(usernameOrEmail, password);
-      
-      if (res.user && res.user.isActive === false) {
-        throw new Error('Account is disabled. Contact administrator.');
-      }
+  try {
+    console.log('📤 Attempting login for:', usernameOrEmail);
+    const res = await loginApi(usernameOrEmail, password);
 
-      setToken(res.token);
-      setUser(res.user);
-      
-      localStorage.setItem('admin_token', res.token);
-      localStorage.setItem('admin_user', JSON.stringify(res.user));
-      localStorage.setItem('token', res.token);
-      localStorage.setItem('user', JSON.stringify(res.user));
-      localStorage.setItem('role', res.user.role);
-      
-      console.log('✅ Login successful:', res.user.username);
-      showToast('success', `Welcome back, ${res.user.username}!`);
-    } catch (err: any) {
-      console.error('❌ Login error:', err.message);
-      showToast('error', err.message || 'Login failed. Please check your credentials.');
-      throw err;
+    // ✅ Unwrap the backend's `data` wrapper
+    const payload = res.data ?? res;
+    const { token: newToken, user: newUser } = payload;
+
+    if (!newToken || !newUser) {
+      throw new Error('Invalid response from server.');
     }
-  };
+
+    if (newUser.isActive === false) {
+      throw new Error('Account is disabled. Contact administrator.');
+    }
+
+    setToken(newToken);
+    setUser(newUser);
+
+    localStorage.setItem('admin_token', newToken);
+    localStorage.setItem('admin_user', JSON.stringify(newUser));
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(newUser));
+    localStorage.setItem('role', newUser.role);
+
+    console.log('✅ Login successful:', newUser.username);
+    showToast('success', `Welcome back, ${newUser.username}!`);
+  } catch (err: any) {
+    console.error('❌ Login error:', err.message);
+    showToast('error', err.message || 'Login failed. Please check your credentials.');
+    throw err;
+  }
+};
 
   const logout = (message?: string) => {
     setToken(null);
