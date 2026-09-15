@@ -6,9 +6,8 @@ import { Compass, Lock, User as UserIcon, AlertCircle, ArrowRight } from 'lucide
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-
-  const [username, setUsername] = useState('admin@deltatravel.com');
-  const [password, setPassword] = useState('admin123');
+const [username, setUsername] = useState('');
+const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -80,7 +79,7 @@ export const Login: React.FC = () => {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin@deltatravel.com"
+                  placeholder="username"
                   className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#E2E8F0] text-sm text-[#111827] focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E] placeholder:text-[#A0AEC0]"
                 />
               </div>
