@@ -13,11 +13,12 @@ import {
   X,
   Compass,
   Send,
-  Share2, 
+  Share2,
   HelpCircle,
   History,
   Building2,
-  Quote
+  Quote,
+  Phone,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -43,22 +44,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   ];
 
   const settingsNav = [
-  { label: 'Social Media', path: '/settings/social', icon: Share2 },
-  { label: 'Team Members', path: '/settings/team-members', icon: Users },
-  { label: 'Office Images', path: '/settings/office-images', icon: Building2 },
-  { label: 'Testimonials', path: '/settings/testimonials', icon: Quote },
-  { label: 'FAQs', path: '/settings/faqs', icon: HelpCircle },
-  { label: 'Price Logs', path: '/settings/price-logs', icon: History },
+    { label: 'Contact Settings', path: '/settings/contact', icon: Phone },
+    { label: 'Social Media', path: '/settings/social', icon: Share2 },
+    { label: 'Team Members', path: '/settings/team-members', icon: Users },
+    { label: 'Office Images', path: '/settings/office-images', icon: Building2 },
+    { label: 'Testimonials', path: '/settings/testimonials', icon: Quote },
+    { label: 'FAQs', path: '/settings/faqs', icon: HelpCircle },
+    { label: 'Price Logs', path: '/settings/price-logs', icon: History },
   ];
 
-  const renderNavGroup = (title: string, items: Array<{ label: string; path: string; icon: any }>) => (
+  const renderNavGroup = (
+    title: string,
+    items: Array<{ label: string; path: string; icon: any }>
+  ) => (
     <div className="mb-4">
       <div className="px-4 mb-2 text-[10px] uppercase tracking-wider text-[#9CA3AF] font-bold">
         {title}
       </div>
-      <div className="space-[#1F2937] space-y-0.5">
+      <div className="space-y-0.5">
         {items.map((item) => {
-          const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+          const isActive =
+            location.pathname === item.path ||
+            (item.path !== '/dashboard' &&
+              location.pathname.startsWith(item.path));
 
           return (
             <NavLink
@@ -71,7 +79,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   : 'text-gray-300 hover:bg-[#1F2937] hover:text-white'
               }`}
             >
-              <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#9CA3AF]'}`} />
+              <item.icon
+                className={`w-4 h-4 shrink-0 ${
+                  isActive ? 'text-white' : 'text-[#9CA3AF]'
+                }`}
+              />
               <span className="text-sm truncate">{item.label}</span>
             </NavLink>
           );
@@ -82,7 +94,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   return (
     <>
-      {/* Mobile backdrop */}
       {isOpen && (
         <div
           onClick={onClose}
@@ -95,29 +106,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Brand Header */}
-      <div className="p-6 border-b border-[#ffffff15] flex items-center justify-between bg-[#111827]">
-  <div className="flex items-center gap-3">
-    {/* Logo with glowing effect - matching the login page */}
-    <div className="relative w-10 h-10 flex-shrink-0">
-      {/* Glow ring */}
-      <div className="absolute inset-0 rounded-lg bg-[#C8102E] blur-md opacity-50 animate-pulse" />
-      <div className="relative w-full h-full rounded-lg overflow-hidden bg-white shadow-lg shadow-[#C8102E]/30 border-2 border-[#C8102E]/30 flex items-center justify-center">
-        <img 
-          src="/logo/logo.jpg" 
-          alt="Delta Travel" 
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"%3E%3Crect width="40" height="40" fill="%23C8102E" rx="8"/%3E%3Ctext x="20" y="26" text-anchor="middle" dy=".3em" fill="white" font-size="18" font-family="sans-serif" font-weight="bold"%3EΔ%3C/text%3E%3C/svg%3E';
-          }}
-        />
-      </div>
-    </div>
-    <div>
-      <h1 className="text-white font-extrabold leading-tight tracking-wide text-base">DELTA TRAVEL</h1>
-      <p className="text-[#FC8181] text-[10px] tracking-widest uppercase font-bold">& TOUR • ADMIN</p>
-    </div>
-  </div>
+        <div className="p-6 border-b border-[#ffffff15] flex items-center justify-between bg-[#111827]">
+          <div className="flex items-center gap-3">
+            <div className="relative w-10 h-10 flex-shrink-0">
+              <div className="absolute inset-0 rounded-lg bg-[#C8102E] blur-md opacity-50 animate-pulse" />
+              <div className="relative w-full h-full rounded-lg overflow-hidden bg-white shadow-lg shadow-[#C8102E]/30 border-2 border-[#C8102E]/30 flex items-center justify-center">
+                <img
+                  src="/logo/logo.jpg"
+                  alt="Delta Travel"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"%3E%3Crect width="40" height="40" fill="%23C8102E" rx="8"/%3E%3Ctext x="20" y="26" text-anchor="middle" dy=".3em" fill="white" font-size="18" font-family="sans-serif" font-weight="bold"%3EΔ%3C/text%3E%3C/svg%3E';
+                  }}
+                />
+              </div>
+            </div>
+            <div>
+              <h1 className="text-white font-extrabold leading-tight tracking-wide text-base">
+                DELTA TRAVEL
+              </h1>
+              <p className="text-[#FC8181] text-[10px] tracking-widest uppercase font-bold">
+                & TOUR • ADMIN
+              </p>
+            </div>
+          </div>
           <button
             onClick={onClose}
             className="lg:hidden text-white/60 hover:text-white p-1 rounded-lg hover:bg-white/10"
@@ -126,22 +139,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Navigation Area */}
         <nav className="flex-1 py-4 overflow-y-auto">
           {renderNavGroup('Main Management', mainManagementNav)}
           {renderNavGroup('Communications & Leads', communicationsNav)}
           {renderNavGroup('Settings', settingsNav)}
         </nav>
 
-        {/* User Card Footer */}
         <div className="p-4 bg-[#0F172A] border-t border-[#ffffff15]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-[#C8102E] flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
-              {user?.username ? user.username.substring(0, 2).toUpperCase() : 'AD'}
+              {user?.username
+                ? user.username.substring(0, 2).toUpperCase()
+                : 'AD'}
             </div>
             <div className="overflow-hidden min-w-0 flex-1">
-              <p className="text-xs font-bold text-white truncate">{user?.username || 'Admin'}</p>
-              <p className="text-[10px] text-[#FC8181] uppercase font-bold">Admin</p>
+              <p className="text-xs font-bold text-white truncate">
+                {user?.username || 'Admin'}
+              </p>
+              <p className="text-[10px] text-[#FC8181] uppercase font-bold">
+                Admin
+              </p>
             </div>
             <button
               onClick={() => logout('Logged out successfully')}

@@ -5,7 +5,6 @@ import { Sidebar } from './components/common/Sidebar';
 import { TopBar } from './components/common/TopBar';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 
-// Lazy load page components
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const PackageList = lazy(() => import('./pages/packages/PackageList').then((m) => ({ default: m.PackageList })));
@@ -26,8 +25,8 @@ const TeamMembers = lazy(() => import('./pages/Settings/TeamMembers').then((m) =
 const OfficeImages = lazy(() => import('./pages/Settings/OfficeImages').then((m) => ({ default: m.OfficeImages })));
 const Testimonials = lazy(() => import('./pages/Settings/Testimonials').then((m) => ({ default: m.Testimonials })));
 const PriceLogs = lazy(() => import('./pages/Settings/PriceLogs').then((m) => ({ default: m.PriceLogs })));
+const ContactSettings = lazy(() => import('./pages/Settings/ContactSettings').then((m) => ({ default: m.ContactSettings })));
 
-// Protected App Layout Wrapper
 const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -59,175 +58,40 @@ export const AppRoutes: React.FC = () => {
   return (
     <Suspense fallback={<LoadingSpinner text="Loading Module..." />}>
       <Routes>
-        {/* Public Login */}
         <Route
           path="/login"
           element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
         />
 
-        {/* Protected Admin Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedLayout>
-              <Dashboard />
-            </ProtectedLayout>
-          }
-        />
+        <Route path="/dashboard" element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
 
         {/* Package Management */}
-        <Route
-          path="/packages"
-          element={
-            <ProtectedLayout>
-              <PackageList />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/packages/new"
-          element={
-            <ProtectedLayout>
-              <PackageFormPage />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/packages/:id/edit"
-          element={
-            <ProtectedLayout>
-              <PackageFormPage />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/packages/:id/persons"
-          element={
-            <ProtectedLayout>
-              <PackagePersons />
-            </ProtectedLayout>
-          }
-        />
+        <Route path="/packages" element={<ProtectedLayout><PackageList /></ProtectedLayout>} />
+        <Route path="/packages/new" element={<ProtectedLayout><PackageFormPage /></ProtectedLayout>} />
+        <Route path="/packages/:id/edit" element={<ProtectedLayout><PackageFormPage /></ProtectedLayout>} />
+        <Route path="/packages/:id/persons" element={<ProtectedLayout><PackagePersons /></ProtectedLayout>} />
 
-        {/* Gallery Management */}
-        <Route
-          path="/gallery"
-          element={
-            <ProtectedLayout>
-              <GalleryGrid />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/gallery/create"
-          element={
-            <ProtectedLayout>
-              <GalleryFormPage />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/gallery/edit/:id"
-          element={
-            <ProtectedLayout>
-              <GalleryFormPage />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/gallery/bulk-upload"
-          element={
-            <ProtectedLayout>
-              <BulkUploadPage />
-            </ProtectedLayout>
-          }
-        />
+        {/* Gallery */}
+        <Route path="/gallery" element={<ProtectedLayout><GalleryGrid /></ProtectedLayout>} />
+        <Route path="/gallery/create" element={<ProtectedLayout><GalleryFormPage /></ProtectedLayout>} />
+        <Route path="/gallery/edit/:id" element={<ProtectedLayout><GalleryFormPage /></ProtectedLayout>} />
+        <Route path="/gallery/bulk-upload" element={<ProtectedLayout><BulkUploadPage /></ProtectedLayout>} />
 
-        {/* Lead & Marketing Modules */}
-        <Route
-          path="/subscribers"
-          element={
-            <ProtectedLayout>
-              <SubscriberManager />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/sms"
-          element={
-            <ProtectedLayout>
-              <SmsCampaignPage />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/inquiries"
-          element={
-            <ProtectedLayout>
-              <InquiryManager />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/leads"
-          element={
-            <ProtectedLayout>
-              <BookingLeads />
-            </ProtectedLayout>
-          }
-        />
+        {/* Leads & Marketing */}
+        <Route path="/subscribers" element={<ProtectedLayout><SubscriberManager /></ProtectedLayout>} />
+        <Route path="/sms" element={<ProtectedLayout><SmsCampaignPage /></ProtectedLayout>} />
+        <Route path="/inquiries" element={<ProtectedLayout><InquiryManager /></ProtectedLayout>} />
+        <Route path="/leads" element={<ProtectedLayout><BookingLeads /></ProtectedLayout>} />
 
-        {/* Settings Routes */}
-        <Route
-          path="/settings/social"
-          element={
-            <ProtectedLayout>
-              <SocialLinks />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/settings/faqs"
-          element={
-            <ProtectedLayout>
-              <Faqs />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/settings/team-members"
-          element={
-            <ProtectedLayout>
-              <TeamMembers />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/settings/office-images"
-          element={
-            <ProtectedLayout>
-              <OfficeImages />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/settings/testimonials"
-          element={
-            <ProtectedLayout>
-              <Testimonials />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/settings/price-logs"
-          element={
-            <ProtectedLayout>
-              <PriceLogs />
-            </ProtectedLayout>
-          }
-        />
+        {/* Settings */}
+        <Route path="/settings/contact" element={<ProtectedLayout><ContactSettings /></ProtectedLayout>} />
+        <Route path="/settings/social" element={<ProtectedLayout><SocialLinks /></ProtectedLayout>} />
+        <Route path="/settings/faqs" element={<ProtectedLayout><Faqs /></ProtectedLayout>} />
+        <Route path="/settings/team-members" element={<ProtectedLayout><TeamMembers /></ProtectedLayout>} />
+        <Route path="/settings/office-images" element={<ProtectedLayout><OfficeImages /></ProtectedLayout>} />
+        <Route path="/settings/testimonials" element={<ProtectedLayout><Testimonials /></ProtectedLayout>} />
+        <Route path="/settings/price-logs" element={<ProtectedLayout><PriceLogs /></ProtectedLayout>} />
 
-        {/* Fallback */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>
