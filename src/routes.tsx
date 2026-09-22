@@ -26,6 +26,7 @@ const OfficeImages = lazy(() => import('./pages/Settings/OfficeImages').then((m)
 const Testimonials = lazy(() => import('./pages/Settings/Testimonials').then((m) => ({ default: m.Testimonials })));
 const PriceLogs = lazy(() => import('./pages/Settings/PriceLogs').then((m) => ({ default: m.PriceLogs })));
 const ContactSettings = lazy(() => import('./pages/Settings/ContactSettings').then((m) => ({ default: m.ContactSettings })));
+const AudioManagement = lazy(() => import('./pages/Settings/AudioManagement').then((m) => ({ default: m.AudioManagement })));
 
 const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -86,6 +87,7 @@ export const AppRoutes: React.FC = () => {
         {/* Settings */}
         <Route path="/settings/contact" element={<ProtectedLayout><ContactSettings /></ProtectedLayout>} />
         <Route path="/settings/social" element={<ProtectedLayout><SocialLinks /></ProtectedLayout>} />
+        <Route path="/settings/audio" element={<ProtectedLayout><AudioManagement /></ProtectedLayout>} />
         <Route path="/settings/faqs" element={<ProtectedLayout><Faqs /></ProtectedLayout>} />
         <Route path="/settings/team-members" element={<ProtectedLayout><TeamMembers /></ProtectedLayout>} />
         <Route path="/settings/office-images" element={<ProtectedLayout><OfficeImages /></ProtectedLayout>} />

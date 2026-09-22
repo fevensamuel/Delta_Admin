@@ -19,6 +19,7 @@ import {
   Building2,
   Quote,
   Phone,
+  Music,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -46,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const settingsNav = [
     { label: 'Contact Settings', path: '/settings/contact', icon: Phone },
     { label: 'Social Media', path: '/settings/social', icon: Share2 },
+    { label: 'Audio / Nasheed', path: '/settings/audio', icon: Music },
     { label: 'Team Members', path: '/settings/team-members', icon: Users },
     { label: 'Office Images', path: '/settings/office-images', icon: Building2 },
     { label: 'Testimonials', path: '/settings/testimonials', icon: Quote },
@@ -65,8 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {items.map((item) => {
           const isActive =
             location.pathname === item.path ||
-            (item.path !== '/dashboard' &&
-              location.pathname.startsWith(item.path));
+            (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
 
           return (
             <NavLink
@@ -156,9 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               <p className="text-xs font-bold text-white truncate">
                 {user?.username || 'Admin'}
               </p>
-              <p className="text-[10px] text-[#FC8181] uppercase font-bold">
-                Admin
-              </p>
+              <p className="text-[10px] text-[#FC8181] uppercase font-bold">Admin</p>
             </div>
             <button
               onClick={() => logout('Logged out successfully')}

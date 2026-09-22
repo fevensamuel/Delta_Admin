@@ -29,7 +29,6 @@ export interface ItineraryDay {
   image?: string;
 }
 
-// Person/Group pricing for packages
 export interface PersonPrice {
   id: string;
   label: string;
@@ -42,7 +41,6 @@ export interface PersonPrice {
   isActive: boolean;
 }
 
-// Discount structure
 export interface Discount {
   id: string;
   type: DiscountType;
@@ -64,25 +62,22 @@ export interface Package {
   titleAr?: string;
   titleAm?: string;
   category: PackageCategory;
-  
-  // Main pricing
+
   price: number;
   priceUsd?: number;
   priceEtb?: number;
   priceSar?: number;
   priceType?: PriceType;
-  
-  // Price range
+
   priceUsdMin?: number;
   priceUsdMax?: number;
   priceEtbMin?: number;
   priceEtbMax?: number;
   priceSarMin?: number;
   priceSarMax?: number;
-  
-  // Discounts
+
   discounts?: Discount[];
-  
+
   durationDays: number;
   departureCity?: string;
   imageUrl: string;
@@ -270,9 +265,22 @@ export interface Person {
   id: string;
   name: string;
   email?: string;
-  phone: string; 
+  phone: string;
   age?: number;
   gender?: 'Male' | 'Female' | 'Child';
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface AudioTrack {
+  id: string;
+  titleEn: string;
+  titleAm: string;
+  titleAr: string;
+  audioUrl: string;
+  duration: number;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
