@@ -31,6 +31,13 @@ import {
   Cell
 } from 'recharts';
 
+// Safe number helper — PostgreSQL NUMERIC columns come back as strings
+const toNum = (value: any, fallback = 0): number => {
+  if (value === null || value === undefined) return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
 export const BookingLeads: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -58,13 +65,16 @@ export const BookingLeads: React.FC = () => {
   };
 
   const packagesArray = Array.isArray(packages) ? packages : [];
-  const totalClicks = packagesArray.reduce((acc, p) => acc + (p.whatsappClicks || 0), 0);
-  const topPackage = [...packagesArray].sort((a, b) => (b.whatsappClicks || 0) - (a.whatsappClicks || 0))[0];
+  const totalClicks = packagesArray.reduce((acc, p) => acc + toNum(p.whatsappClicks, 0), 0);
+  const topPackage = [...packagesArray].sort(
+    (a, b) => toNum(b.whatsappClicks, 0) - toNum(a.whatsappClicks, 0)
+  )[0];
 
   // Category chart data
   const categoriesMap: Record<string, number> = {};
   packagesArray.forEach((p) => {
-    categoriesMap[p.category] = (categoriesMap[p.category] || 0) + (p.whatsappClicks || 0);
+    const key = p.category || 'Uncategorized';
+    categoriesMap[key] = (categoriesMap[key] || 0) + toNum(p.whatsappClicks, 0);
   });
   const categoryPieData = Object.keys(categoriesMap).map((cat) => ({
     name: cat,
@@ -73,31 +83,30 @@ export const BookingLeads: React.FC = () => {
 
   const COLORS = ['#1A5B4B', '#C9A84C', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-  // Calculate actual percentage for top category
   const getTopCategoryPercentage = () => {
     if (categoryPieData.length === 0 || totalClicks === 0) return 0;
     const sorted = [...categoryPieData].sort((a, b) => b.value - a.value);
-    return Math.round((sorted[0]?.value || 0) / totalClicks * 100);
+    return Math.round(((sorted[0]?.value || 0) / totalClicks) * 100);
   };
 
-  // Calculate trend vs last month (simplified - using available data)
   const getTrendData = () => {
-    // Sort packages by createdAt to get latest
-    const sortedByDate = [...packagesArray].sort((a, b) => 
-      new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    const sortedByDate = [...packagesArray].sort(
+      (a, b) =>
+        new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
     );
-    
-    // Split into two halves: older and newer
+
     const midPoint = Math.floor(sortedByDate.length / 2);
     const olderPackages = sortedByDate.slice(0, midPoint);
     const newerPackages = sortedByDate.slice(midPoint);
-    
-    const olderClicks = olderPackages.reduce((acc, p) => acc + (p.whatsappClicks || 0), 0);
-    const newerClicks = newerPackages.reduce((acc, p) => acc + (p.whatsappClicks || 0), 0);
-    
-    if (olderClicks === 0 && newerClicks === 0) return { value: 0, isPositive: true, display: 'No data yet' };
-    if (olderClicks === 0) return { value: 100, isPositive: true, display: '+100% vs previous' };
-    
+
+    const olderClicks = olderPackages.reduce((acc, p) => acc + toNum(p.whatsappClicks, 0), 0);
+    const newerClicks = newerPackages.reduce((acc, p) => acc + toNum(p.whatsappClicks, 0), 0);
+
+    if (olderClicks === 0 && newerClicks === 0)
+      return { value: 0, isPositive: true, display: 'No data yet' };
+    if (olderClicks === 0)
+      return { value: 100, isPositive: true, display: '+100% vs previous' };
+
     const percentageChange = ((newerClicks - olderClicks) / olderClicks) * 100;
     return {
       value: Math.abs(Math.round(percentageChange)),
@@ -114,27 +123,43 @@ export const BookingLeads: React.FC = () => {
       return;
     }
 
-    const headers = ['Package Name', 'Category', 'Price USD', 'Price ETB', 'Duration Days', 'WhatsApp Clicks'];
-    const rows = packagesArray.map((p) => [
-      `"${p.titleEn}"`,
-      p.category,
-      p.priceUsd || p.price || 0,
-      p.priceEtb || Math.round((p.priceUsd || p.price || 0) * rate),
-      p.durationDays || 0,
-      p.whatsappClicks || 0
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const headers = [
+      'Package Name',
+      'Category',
+      'Price USD',
+      'Price ETB',
+      'Duration Days',
+      'WhatsApp Clicks'
+    ];
+    const rows = packagesArray.map((p) => {
+      const priceUsd = toNum(p.priceUsd ?? p.price, 0);
+      const priceEtb = toNum(p.priceEtb, Math.round(priceUsd * rate));
+      return [
+        `"${p.titleEn || ''}"`,
+        p.category || '',
+        priceUsd,
+        priceEtb,
+        toNum(p.durationDays, 0),
+        toNum(p.whatsappClicks, 0)
+      ];
+    });
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const link = document.createElement('a');
     link.href = encodeURI(csvContent);
-    link.download = `delta_whatsapp_booking_leads_${new Date().toISOString().substring(0, 10)}.csv`;
+    link.download = `delta_whatsapp_booking_leads_${new Date()
+      .toISOString()
+      .substring(0, 10)}.csv`;
     link.click();
     showToast('success', 'Exported WhatsApp booking click report CSV');
   };
 
-  // Calculate average price
-  const avgPrice = packagesArray.length > 0 
-    ? packagesArray.reduce((acc, p) => acc + (p.priceUsd || p.price || 0), 0) / packagesArray.length 
-    : 0;
+  const avgPrice =
+    packagesArray.length > 0
+      ? packagesArray.reduce((acc, p) => acc + toNum(p.priceUsd ?? p.price, 0), 0) /
+        packagesArray.length
+      : 0;
 
   if (isLoading) {
     return <LoadingSpinner text="Loading Lead Conversion Analytics..." />;
@@ -145,7 +170,9 @@ export const BookingLeads: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900">WhatsApp Booking Leads Analytics</h2>
+          <h2 className="text-xl font-extrabold text-slate-900">
+            WhatsApp Booking Leads Analytics
+          </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Tracks high-intent customer clicks on "Book on WhatsApp" buttons across all packages.
           </p>
@@ -176,34 +203,38 @@ export const BookingLeads: React.FC = () => {
       <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-3">
         <MessageCircle className="w-5 h-5 text-[#C9A84C] shrink-0" />
         <p className="font-medium">
-          <strong>System Scope Note:</strong> Delta Travel operates via direct WhatsApp messaging. Clicks measured below reflect prospective pilgrims who initiated a booking request to your agency phone on WhatsApp.
+          <strong>System Scope Note:</strong> Delta Travel operates via direct WhatsApp messaging.
+          Clicks measured below reflect prospective pilgrims who initiated a booking request to your
+          agency phone on WhatsApp.
         </p>
       </div>
 
-      {/* Key Metrics - With Actual Data */}
+      {/* Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatsCard
           title="Total WhatsApp Clicks"
           value={totalClicks}
           icon={MousePointerClick}
           subtitle="Overall booking leads"
-          trend={{ 
-            value: trendData.display, 
-            isPositive: trendData.isPositive 
-          }}
+          trend={{ value: trendData.display, isPositive: trendData.isPositive }}
           accentColor="emerald"
         />
         <StatsCard
           title="Top Package Lead"
           value={topPackage ? topPackage.titleEn : '—'}
           icon={Award}
-          subtitle={topPackage ? `${topPackage.whatsappClicks || 0} direct inquiries` : 'No data'}
+          subtitle={
+            topPackage ? `${toNum(topPackage.whatsappClicks, 0)} direct inquiries` : 'No data'
+          }
           accentColor="amber"
         />
         <StatsCard
           title="Top Category"
-          value={categoryPieData.length > 0 ? 
-            categoryPieData.sort((a, b) => b.value - a.value)[0]?.name || 'N/A' : 'N/A'}
+          value={
+            categoryPieData.length > 0
+              ? categoryPieData.sort((a, b) => b.value - a.value)[0]?.name || 'N/A'
+              : 'N/A'
+          }
           icon={TrendingUp}
           subtitle={`${getTopCategoryPercentage()}% of total intent`}
           accentColor="sky"
@@ -219,44 +250,73 @@ export const BookingLeads: React.FC = () => {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Top Packages Bar Chart (2 cols) */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-          <h3 className="text-base font-bold text-slate-900">Top Packages by WhatsApp Booking Clicks</h3>
+          <h3 className="text-base font-bold text-slate-900">
+            Top Packages by WhatsApp Booking Clicks
+          </h3>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={packagesArray.slice(0, 5)} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                 <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} />
-                <YAxis dataKey="titleEn" type="category" width={150} stroke="#475569" fontSize={11} tickLine={false} />
-                <Tooltip contentStyle={{ backgroundColor: '#1A1A2E', borderRadius: '12px', color: '#fff' }} />
+                <YAxis
+                  dataKey="titleEn"
+                  type="category"
+                  width={150}
+                  stroke="#475569"
+                  fontSize={11}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1A1A2E',
+                    borderRadius: '12px',
+                    color: '#fff'
+                  }}
+                />
                 <Bar dataKey="whatsappClicks" fill="#1A5B4B" radius={[0, 8, 8, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Category Pie Chart */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
           <h3 className="text-base font-bold text-slate-900">Intent by Travel Tier</h3>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={categoryPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                <Pie
+                  data={categoryPieData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label
+                >
                   {categoryPieData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1A1A2E', borderRadius: '12px', color: '#fff' }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1A1A2E',
+                    borderRadius: '12px',
+                    color: '#fff'
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* Detailed Package Clicks Table */}
+      {/* Detailed Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900">Package Conversion Performance Breakdown</h3>
+          <h3 className="text-base font-bold text-slate-900">
+            Package Conversion Performance Breakdown
+          </h3>
         </div>
 
         <div className="overflow-x-auto">
@@ -281,9 +341,9 @@ export const BookingLeads: React.FC = () => {
                 </tr>
               ) : (
                 packagesArray.map((pkg) => {
-                  const priceUsd = pkg.priceUsd || pkg.price || 0;
-                  const priceEtb = pkg.priceEtb || Math.round(priceUsd * rate);
-                  
+                  const priceUsd = toNum(pkg.priceUsd ?? pkg.price, 0);
+                  const priceEtb = toNum(pkg.priceEtb, Math.round(priceUsd * rate));
+
                   return (
                     <tr key={pkg.id} className="hover:bg-slate-50 transition-colors">
                       <td className="p-3.5 pl-5 font-bold text-slate-900 text-sm">
@@ -294,12 +354,18 @@ export const BookingLeads: React.FC = () => {
                           {pkg.category || 'Uncategorized'}
                         </span>
                       </td>
-                      <td className="p-3.5 font-bold text-slate-900">${priceUsd.toFixed(2)}</td>
-                      <td className="p-3.5 font-bold text-emerald-700">{priceEtb.toLocaleString()} ETB</td>
-                      <td className="p-3.5 text-slate-600">{pkg.durationDays || 0} Days</td>
+                      <td className="p-3.5 font-bold text-slate-900">
+                        ${priceUsd.toFixed(2)}
+                      </td>
+                      <td className="p-3.5 font-bold text-emerald-700">
+                        {priceEtb.toLocaleString()} ETB
+                      </td>
+                      <td className="p-3.5 text-slate-600">
+                        {toNum(pkg.durationDays, 0)} Days
+                      </td>
                       <td className="p-3.5">
                         <span className="font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                          {pkg.whatsappClicks || 0} clicks
+                          {toNum(pkg.whatsappClicks, 0)} clicks
                         </span>
                       </td>
                       <td className="p-3.5 pr-5 text-right">
