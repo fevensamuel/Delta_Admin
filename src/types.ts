@@ -267,6 +267,7 @@ export interface Person {
   id: string;
   name: string;
   phone: string;
+  passportNumber: string;
   gender?: 'Male' | 'Female' | 'Child';
   customerCategory: CustomerCategory;
   createdAt?: string;

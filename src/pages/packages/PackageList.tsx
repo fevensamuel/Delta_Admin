@@ -81,6 +81,7 @@ export const PackageList: React.FC = () => {
   const [newPerson, setNewPerson] = useState({
     name: '',
     phone: '',
+    passportNumber: '',
     gender: '' as 'Male' | 'Female' | 'Child' | '',
     customerCategory: 'New' as CustomerCategory,
   });
@@ -155,6 +156,10 @@ export const PackageList: React.FC = () => {
       showToast('error', 'Phone number is required');
       return;
     }
+    if (!newPerson.passportNumber.trim()) {
+      showToast('error', 'Passport number is required');
+      return;
+    }
 
     setIsAddingPerson(true);
     try {
@@ -162,6 +167,7 @@ export const PackageList: React.FC = () => {
         id: `person-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
         name: newPerson.name.trim(),
         phone: newPerson.phone.trim(),
+        passportNumber: newPerson.passportNumber.trim(),
         gender: newPerson.gender || undefined,
         customerCategory: newPerson.customerCategory || 'New',
       }];
@@ -169,7 +175,7 @@ export const PackageList: React.FC = () => {
       await updatePackageApi(selectedPackageForPerson.id, { persons: updatedPersons });
       showToast('success', `Person "${newPerson.name}" added successfully`);
       setShowAddPersonModal(false);
-      setNewPerson({ name: '', phone: '', gender: '', customerCategory: 'New' });
+      setNewPerson({ name: '', phone: '', passportNumber: '', gender: '', customerCategory: 'New' });
       await loadPackages();
     } catch (error) {
       console.error('Error adding person:', error);
@@ -213,6 +219,30 @@ export const PackageList: React.FC = () => {
     }
   };
 
+  const handleQuickPassportChange = async (person: any, packageId: string, newPassport: string) => {
+    const trimmed = newPassport.trim();
+    if (!trimmed) {
+      showToast('error', 'Passport number cannot be empty');
+      return;
+    }
+    if (trimmed === (person.passportNumber || '')) return;
+
+    try {
+      const pkg = packagesArray.find(p => p.id === packageId);
+      if (!pkg) return;
+      
+      const updatedPersons = (pkg.persons || []).map((p: any) => 
+        p.id === person.id ? { ...p, passportNumber: trimmed } : p
+      );
+      await updatePackageApi(packageId, { persons: updatedPersons });
+      showToast('success', 'Passport number updated');
+      await loadPackages();
+    } catch (error) {
+      console.error('Error updating passport:', error);
+      showToast('error', 'Failed to update passport number');
+    }
+  };
+
   const packagesArray = Array.isArray(packages) ? packages : [];
 
   const getAllPersons = () => {
@@ -235,9 +265,11 @@ export const PackageList: React.FC = () => {
   const allPersons = getAllPersons();
 
   const filteredPersons = allPersons.filter((person) => {
+    const term = personSearchTerm.toLowerCase();
     const matchesSearch = 
-      person.name?.toLowerCase().includes(personSearchTerm.toLowerCase()) ||
-      person.phone?.includes(personSearchTerm);
+      person.name?.toLowerCase().includes(term) ||
+      person.phone?.includes(personSearchTerm) ||
+      person.passportNumber?.toLowerCase().includes(term);
     const matchesPackage = selectedPackageFilter === 'All' || person.packageId === selectedPackageFilter;
     const matchesCategory =
       personCategoryFilter === 'All' ||
@@ -496,7 +528,7 @@ export const PackageList: React.FC = () => {
                   type="text"
                   value={personSearchTerm}
                   onChange={(e) => { setPersonSearchTerm(e.target.value); setPersonsCurrentPage(1); }}
-                  placeholder="Search persons by name or phone..."
+                  placeholder="Search by name, phone, or passport number..."
                   className="w-full pl-10 pr-3.5 py-2 rounded-lg border border-[#E2E8F0] text-xs text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]"
                 />
               </div>
@@ -566,6 +598,7 @@ export const PackageList: React.FC = () => {
                 <tr>
                   <th className="p-3.5 pl-5">Name</th>
                   <th className="p-3.5">Phone</th>
+                  <th className="p-3.5">Passport</th>
                   <th className="p-3.5">Gender</th>
                   <th className="p-3.5">Customer Category</th>
                   <th className="p-3.5">Package</th>
@@ -575,7 +608,7 @@ export const PackageList: React.FC = () => {
               <tbody className="divide-y divide-[#E2E8F0] font-medium text-[#2D3748]">
                 {paginatedPersons.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-[#718096]">
+                    <td colSpan={7} className="p-8 text-center text-[#718096]">
                       {allPersons.length === 0 
                         ? 'No persons found. Select a package and click "Add Person".' 
                         : 'No persons match the current search or filter criteria.'}
@@ -593,6 +626,21 @@ export const PackageList: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-3.5 text-[#718096]">{person.phone || '—'}</td>
+                      <td className="p-3.5">
+                        <input
+                          type="text"
+                          defaultValue={person.passportNumber || ''}
+                          onBlur={(e) => handleQuickPassportChange(person, person.packageId, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          placeholder="—"
+                          className="w-32 px-2 py-1 rounded border border-transparent hover:border-[#E2E8F0] focus:border-[#2D7D6B] focus:bg-white text-xs font-mono text-[#2D3748] bg-transparent focus:outline-none"
+                          title="Click to edit passport number"
+                        />
+                      </td>
                       <td className="p-3.5 text-[#718096]">{person.gender || '—'}</td>
                       <td className="p-3.5">
                         <select
@@ -678,7 +726,7 @@ export const PackageList: React.FC = () => {
               <button 
                 onClick={() => {
                   setShowAddPersonModal(false);
-                  setNewPerson({ name: '', phone: '', gender: '', customerCategory: 'New' });
+                  setNewPerson({ name: '', phone: '', passportNumber: '', gender: '', customerCategory: 'New' });
                 }} 
                 className="text-[#718096] hover:text-[#111827]"
               >
@@ -708,6 +756,17 @@ export const PackageList: React.FC = () => {
                   className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
                 />
                 <p className="text-[9px] text-[#718096] mt-1">Required for SMS campaigns</p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#111827] mb-1">Passport Number *</label>
+                <input
+                  type="text"
+                  required
+                  value={newPerson.passportNumber}
+                  onChange={(e) => setNewPerson({ ...newPerson, passportNumber: e.target.value.toUpperCase() })}
+                  placeholder="e.g. EP1234567"
+                  className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm font-mono focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
+                />
               </div>
               <div>
                 <label className="block text-xs font-bold text-[#111827] mb-1">Customer Category *</label>
@@ -748,7 +807,7 @@ export const PackageList: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setShowAddPersonModal(false);
-                    setNewPerson({ name: '', phone: '', gender: '', customerCategory: 'New' });
+                    setNewPerson({ name: '', phone: '', passportNumber: '', gender: '', customerCategory: 'New' });
                   }}
                   className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#718096] hover:bg-[#F9FAFB] transition-colors text-sm font-semibold"
                 >

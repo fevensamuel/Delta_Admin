@@ -10,6 +10,7 @@ interface PackagePerson {
   id: string;
   name: string;
   phone: string;
+  passportNumber?: string;
   gender?: 'Male' | 'Female' | 'Child';
   customerCategory?: CustomerCategory;
 }
@@ -80,6 +81,7 @@ export const PackagePersons: React.FC = () => {
             id: person.id || `person-${Date.now()}-${Math.random()}`,
             name: person.name || 'Unnamed',
             phone: person.phone || '',
+            passportNumber: person.passportNumber || '',
             gender: person.gender,
             customerCategory: person.customerCategory || 'New',
             packageTitle: pkg.titleEn || 'Unknown Package',
@@ -96,11 +98,12 @@ export const PackagePersons: React.FC = () => {
   const allPersons = getAllPersons();
 
   const filteredPersons = allPersons.filter((person) => {
-    const searchLower = searchTerm.toLowerCase();
+    const term = searchTerm.toLowerCase();
     const matchesSearch = 
-      person.name?.toLowerCase().includes(searchLower) ||
+      person.name?.toLowerCase().includes(term) ||
       person.phone?.includes(searchTerm) ||
-      person.packageTitle?.toLowerCase().includes(searchLower);
+      person.passportNumber?.toLowerCase().includes(term) ||
+      person.packageTitle?.toLowerCase().includes(term);
     const matchesPackage = selectedPackageId === 'All' || person.packageId === selectedPackageId;
     const matchesCategory =
       categoryFilter === 'All' ||
@@ -157,7 +160,7 @@ export const PackagePersons: React.FC = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name, phone, or package..."
+              placeholder="Search by name, phone, passport, or package..."
               className="w-full pl-10 pr-3.5 py-2 rounded-lg border border-[#E2E8F0] text-xs text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]"
             />
           </div>
@@ -217,6 +220,7 @@ export const PackagePersons: React.FC = () => {
                 <tr>
                   <th className="p-3.5 pl-5">Name</th>
                   <th className="p-3.5">Phone</th>
+                  <th className="p-3.5">Passport</th>
                   <th className="p-3.5">Gender</th>
                   <th className="p-3.5">Customer Category</th>
                   <th className="p-3.5">Package</th>
@@ -226,7 +230,7 @@ export const PackagePersons: React.FC = () => {
               <tbody className="divide-y divide-[#E2E8F0] font-medium text-[#2D3748]">
                 {paginatedPersons.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-[#718096]">
+                    <td colSpan={7} className="p-8 text-center text-[#718096]">
                       No persons found matching your search criteria.
                     </td>
                   </tr>
@@ -246,6 +250,9 @@ export const PackagePersons: React.FC = () => {
                           <Phone className="w-3 h-3" />
                           {person.phone || '—'}
                         </div>
+                      </td>
+                      <td className="p-3.5">
+                        <span className="font-mono text-[#2D3748]">{person.passportNumber || '—'}</span>
                       </td>
                       <td className="p-3.5 text-[#718096]">
                         {person.gender || '—'}

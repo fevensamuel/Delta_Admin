@@ -64,8 +64,8 @@ export const OfficeImages: React.FC = () => {
       showToast('error', 'Please select a valid image file');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('error', 'Image size must be less than 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('error', 'Image size must be less than 10MB');
       return;
     }
     setSelectedFile(file);

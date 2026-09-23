@@ -68,11 +68,12 @@ export async function updatePackageApi(id: string, data: FormData | Partial<Pack
     const isFormData = data instanceof FormData;
     
     // If it's JSON and has persons, ensure it's properly formatted
-   if (!isFormData && data.persons) {
+ if (!isFormData && data.persons) {
   data.persons = data.persons.map((person: any) => ({
     id: person.id || `person-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
     name: person.name,
     phone: person.phone,
+    passportNumber: person.passportNumber || '',
     gender: person.gender,
     customerCategory: person.customerCategory || 'New',
   }));
