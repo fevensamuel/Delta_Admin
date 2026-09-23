@@ -20,6 +20,7 @@ import {
   Quote,
   Phone,
   Music,
+  Plane,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -38,11 +39,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   ];
 
   const communicationsNav = [
-    { label: 'Inquiries', path: '/inquiries', icon: Mail },
-    { label: 'Subscribers', path: '/subscribers', icon: Users },
-    { label: 'SMS Campaigns', path: '/sms', icon: Send },
-    { label: 'Booking Leads', path: '/leads', icon: BarChart3 },
-  ];
+  { label: 'Inquiries', path: '/inquiries', icon: Mail },
+  { label: 'Flight Inquiries', path: '/flight-inquiries', icon: Plane },
+  { label: 'Subscribers', path: '/subscribers', icon: Users },
+  { label: 'SMS Campaigns', path: '/sms', icon: Send },
+  { label: 'Booking Leads', path: '/leads', icon: BarChart3 },
+];
 
   const settingsNav = [
     { label: 'Contact Settings', path: '/settings/contact', icon: Phone },

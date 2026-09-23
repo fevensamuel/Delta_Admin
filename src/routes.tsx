@@ -17,6 +17,7 @@ const SubscriberManager = lazy(() => import('./pages/subscribers/SubscriberManag
 const SmsCampaignPage = lazy(() => import('./pages/sms/SmsCampaignPage').then((m) => ({ default: m.SmsCampaignPage })));
 const InquiryManager = lazy(() => import('./pages/inquiries/InquiryManager').then((m) => ({ default: m.InquiryManager })));
 const BookingLeads = lazy(() => import('./pages/leads/BookingLeads').then((m) => ({ default: m.BookingLeads })));
+const FlightInquiries = lazy(() => import('./pages/leads/FlightInquiries').then((m) => ({ default: m.FlightInquiries })));
 
 // Settings Pages
 const SocialLinks = lazy(() => import('./pages/Settings/SocialLinks').then((m) => ({ default: m.SocialLinks })));
@@ -83,6 +84,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="/sms" element={<ProtectedLayout><SmsCampaignPage /></ProtectedLayout>} />
         <Route path="/inquiries" element={<ProtectedLayout><InquiryManager /></ProtectedLayout>} />
         <Route path="/leads" element={<ProtectedLayout><BookingLeads /></ProtectedLayout>} />
+        <Route path="/flight-inquiries" element={<ProtectedLayout><FlightInquiries /></ProtectedLayout>} />
 
         {/* Settings */}
         <Route path="/settings/contact" element={<ProtectedLayout><ContactSettings /></ProtectedLayout>} />

@@ -284,3 +284,25 @@ export interface AudioTrack {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface FlightInquiry {
+  id: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  fromCity: string;
+  destination: string;
+  departureDate: string;
+  returnDate: string;
+  tripType: string;
+  passengers: number;
+  cabinClass: string;
+  preferredAirline: string;
+  notes: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type FlightInquiryStatus = 'New' | 'Booked' | 'Cancelled';
+export type TripType = 'One Way' | 'Round Trip';
