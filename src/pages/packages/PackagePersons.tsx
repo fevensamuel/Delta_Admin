@@ -1,19 +1,38 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package } from '../../types';
+import { Package, CustomerCategory } from '../../types';
 import { getPackagesApi } from '../../api/packages';
 import { useToast } from '../../context/ToastContext';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { Search, Filter, User, Edit, Users, Mail, Phone, RefreshCw, MapPin, Calendar, UserPlus } from 'lucide-react';
+import { Search, Filter, User, Edit, Users, Phone, RefreshCw, MapPin, UserPlus } from 'lucide-react';
 
 interface PackagePerson {
   id: string;
   name: string;
-  email: string;
   phone: string;
-  age?: number;
   gender?: 'Male' | 'Female' | 'Child';
+  customerCategory?: CustomerCategory;
 }
+
+const CATEGORY_OPTIONS: Array<'All' | CustomerCategory> = [
+  'All',
+  'New',
+  'Customer',
+  'Regular Customer',
+];
+
+const getCategoryColor = (category?: string): string => {
+  switch (category) {
+    case 'New':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'Customer':
+      return 'bg-blue-100 text-blue-800';
+    case 'Regular Customer':
+      return 'bg-emerald-100 text-emerald-800';
+    default:
+      return 'bg-gray-100 text-gray-600';
+  }
+};
 
 export const PackagePersons: React.FC = () => {
   const navigate = useNavigate();
@@ -23,6 +42,7 @@ export const PackagePersons: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPackageId, setSelectedPackageId] = useState<string>('All');
+  const [categoryFilter, setCategoryFilter] = useState<'All' | CustomerCategory>('All');
 
   useEffect(() => {
     loadPackages();
@@ -34,15 +54,6 @@ export const PackagePersons: React.FC = () => {
       const data = await getPackagesApi();
       const packageArray = Array.isArray(data) ? data : [];
       setPackages(packageArray);
-      
-      // Debug: Log packages with persons
-      console.log('📦 Packages loaded:', packageArray.length);
-      packageArray.forEach(pkg => {
-        console.log(`  - ${pkg.titleEn}: ${pkg.persons?.length || 0} persons`);
-        if (pkg.persons && pkg.persons.length > 0) {
-          console.log(`    Persons:`, pkg.persons);
-        }
-      });
     } catch (error) {
       console.error('❌ Error loading packages:', error);
       showToast('error', 'Failed to load packages');
@@ -63,16 +74,14 @@ export const PackagePersons: React.FC = () => {
     const allPersons: (PackagePerson & { packageTitle: string; packageId: string; packageCategory: string })[] = [];
     
     packages.forEach(pkg => {
-      // Check if persons exists and is an array
       if (pkg.persons && Array.isArray(pkg.persons) && pkg.persons.length > 0) {
         pkg.persons.forEach((person: any) => {
           allPersons.push({
             id: person.id || `person-${Date.now()}-${Math.random()}`,
             name: person.name || 'Unnamed',
-            email: person.email || '',
             phone: person.phone || '',
-            age: person.age,
             gender: person.gender,
+            customerCategory: person.customerCategory || 'New',
             packageTitle: pkg.titleEn || 'Unknown Package',
             packageId: pkg.id,
             packageCategory: pkg.category || 'Uncategorized'
@@ -90,11 +99,13 @@ export const PackagePersons: React.FC = () => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
       person.name?.toLowerCase().includes(searchLower) ||
-      person.email?.toLowerCase().includes(searchLower) ||
       person.phone?.includes(searchTerm) ||
       person.packageTitle?.toLowerCase().includes(searchLower);
     const matchesPackage = selectedPackageId === 'All' || person.packageId === selectedPackageId;
-    return matchesSearch && matchesPackage;
+    const matchesCategory =
+      categoryFilter === 'All' ||
+      (person.customerCategory || 'New') === categoryFilter;
+    return matchesSearch && matchesPackage && matchesCategory;
   });
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -102,17 +113,9 @@ export const PackagePersons: React.FC = () => {
   const totalPages = Math.ceil(filteredPersons.length / pageSize) || 1;
   const paginatedPersons = filteredPersons.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedPackageId]);
-
-  const getGenderColor = (gender?: string) => {
-    if (gender === 'Male') return 'text-blue-600 bg-blue-100';
-    if (gender === 'Female') return 'text-pink-600 bg-pink-100';
-    if (gender === 'Child') return 'text-yellow-600 bg-yellow-100';
-    return 'text-gray-600 bg-gray-100';
-  };
+  }, [searchTerm, selectedPackageId, categoryFilter]);
 
   if (isLoading) {
     return <LoadingSpinner text="Loading package persons..." />;
@@ -154,7 +157,7 @@ export const PackagePersons: React.FC = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name, email, phone, or package..."
+              placeholder="Search by name, phone, or package..."
               className="w-full pl-10 pr-3.5 py-2 rounded-lg border border-[#E2E8F0] text-xs text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]"
             />
           </div>
@@ -174,6 +177,19 @@ export const PackagePersons: React.FC = () => {
                   </option>
                 );
               })}
+            </select>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as any)}
+              className="px-3 py-2 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#111827] bg-white focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]"
+            >
+              {CATEGORY_OPTIONS.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat === 'All' ? 'All Categories' : cat}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -201,9 +217,8 @@ export const PackagePersons: React.FC = () => {
                 <tr>
                   <th className="p-3.5 pl-5">Name</th>
                   <th className="p-3.5">Phone</th>
-                  <th className="p-3.5">Email</th>
-                  <th className="p-3.5">Age</th>
                   <th className="p-3.5">Gender</th>
+                  <th className="p-3.5">Customer Category</th>
                   <th className="p-3.5">Package</th>
                   <th className="p-3.5 text-right pr-5">Actions</th>
                 </tr>
@@ -211,7 +226,7 @@ export const PackagePersons: React.FC = () => {
               <tbody className="divide-y divide-[#E2E8F0] font-medium text-[#2D3748]">
                 {paginatedPersons.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-[#718096]">
+                    <td colSpan={6} className="p-8 text-center text-[#718096]">
                       No persons found matching your search criteria.
                     </td>
                   </tr>
@@ -232,23 +247,13 @@ export const PackagePersons: React.FC = () => {
                           {person.phone || '—'}
                         </div>
                       </td>
-                      <td className="p-3.5">
-                        <div className="flex items-center gap-1 text-[#718096]">
-                          <Mail className="w-3 h-3" />
-                          {person.email || '—'}
-                        </div>
-                      </td>
                       <td className="p-3.5 text-[#718096]">
-                        {person.age || '—'}
+                        {person.gender || '—'}
                       </td>
                       <td className="p-3.5">
-                        {person.gender ? (
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getGenderColor(person.gender)}`}>
-                            {person.gender}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${getCategoryColor(person.customerCategory)}`}>
+                          {person.customerCategory || 'New'}
+                        </span>
                       </td>
                       <td className="p-3.5">
                         <button

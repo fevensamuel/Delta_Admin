@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package } from '../../types';
+import { Package, CustomerCategory } from '../../types';
 import { getPackagesApi, deletePackageApi, updatePackageApi } from '../../api/packages';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
 
-// Helper function to get full image URL
 const getFullImageUrl = (path: string): string => {
   if (!path) return '';
   if (path.startsWith('http://') || path.startsWith('https://')) {
@@ -29,6 +28,21 @@ const getFullImageUrl = (path: string): string => {
     return `${baseWithoutApi}${path}`;
   }
   return `${baseWithoutApi}/uploads/packages/${path}`;
+};
+
+const CATEGORY_OPTIONS: CustomerCategory[] = ['New', 'Customer', 'Regular Customer'];
+
+const getCategoryColor = (category?: string): string => {
+  switch (category) {
+    case 'New':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'Customer':
+      return 'bg-blue-100 text-blue-800';
+    case 'Regular Customer':
+      return 'bg-emerald-100 text-emerald-800';
+    default:
+      return 'bg-gray-100 text-gray-600';
+  }
 };
 
 export const PackageList: React.FC = () => {
@@ -56,6 +70,7 @@ export const PackageList: React.FC = () => {
   // Persons tab state
   const [personSearchTerm, setPersonSearchTerm] = useState('');
   const [selectedPackageFilter, setSelectedPackageFilter] = useState<string>('All');
+  const [personCategoryFilter, setPersonCategoryFilter] = useState<'All' | CustomerCategory>('All');
   const [personsCurrentPage, setPersonsCurrentPage] = useState(1);
   const personsPageSize = 10;
 
@@ -65,10 +80,9 @@ export const PackageList: React.FC = () => {
   const [isAddingPerson, setIsAddingPerson] = useState(false);
   const [newPerson, setNewPerson] = useState({
     name: '',
-    email: '',
     phone: '',
-    age: undefined as number | undefined,
-    gender: '' as 'Male' | 'Female' | 'Child' | ''
+    gender: '' as 'Male' | 'Female' | 'Child' | '',
+    customerCategory: 'New' as CustomerCategory,
   });
 
   useEffect(() => {
@@ -130,12 +144,15 @@ export const PackageList: React.FC = () => {
     }
   };
 
-  // Handle adding a person to a package
   const handleAddPersonSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPackageForPerson) return;
     if (!newPerson.name.trim()) {
       showToast('error', 'Name is required');
+      return;
+    }
+    if (!newPerson.phone.trim()) {
+      showToast('error', 'Phone number is required');
       return;
     }
 
@@ -144,16 +161,15 @@ export const PackageList: React.FC = () => {
       const updatedPersons = [...(selectedPackageForPerson.persons || []), {
         id: `person-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
         name: newPerson.name.trim(),
-        email: newPerson.email || '',
-        phone: newPerson.phone || '',
-        age: newPerson.age,
-        gender: newPerson.gender || undefined
+        phone: newPerson.phone.trim(),
+        gender: newPerson.gender || undefined,
+        customerCategory: newPerson.customerCategory || 'New',
       }];
       
       await updatePackageApi(selectedPackageForPerson.id, { persons: updatedPersons });
       showToast('success', `Person "${newPerson.name}" added successfully`);
       setShowAddPersonModal(false);
-      setNewPerson({ name: '', email: '', phone: '', age: undefined, gender: '' });
+      setNewPerson({ name: '', phone: '', gender: '', customerCategory: 'New' });
       await loadPackages();
     } catch (error) {
       console.error('Error adding person:', error);
@@ -163,7 +179,6 @@ export const PackageList: React.FC = () => {
     }
   };
 
-  // Handle removing a person from a package
   const handleRemovePerson = async (person: any, packageId: string) => {
     if (!window.confirm(`Remove "${person.name}" from this package?`)) return;
     
@@ -181,9 +196,25 @@ export const PackageList: React.FC = () => {
     }
   };
 
+  const handleQuickCategoryChange = async (person: any, packageId: string, newCategory: CustomerCategory) => {
+    try {
+      const pkg = packagesArray.find(p => p.id === packageId);
+      if (!pkg) return;
+      
+      const updatedPersons = (pkg.persons || []).map((p: any) => 
+        p.id === person.id ? { ...p, customerCategory: newCategory } : p
+      );
+      await updatePackageApi(packageId, { persons: updatedPersons });
+      showToast('success', `Category updated to "${newCategory}"`);
+      await loadPackages();
+    } catch (error) {
+      console.error('Error updating category:', error);
+      showToast('error', 'Failed to update category');
+    }
+  };
+
   const packagesArray = Array.isArray(packages) ? packages : [];
 
-  // Get all persons from all packages (actual people, not price categories)
   const getAllPersons = () => {
     const allPersons: any[] = [];
     packagesArray.forEach(pkg => {
@@ -203,14 +234,15 @@ export const PackageList: React.FC = () => {
 
   const allPersons = getAllPersons();
 
-  // Filter persons
   const filteredPersons = allPersons.filter((person) => {
     const matchesSearch = 
       person.name?.toLowerCase().includes(personSearchTerm.toLowerCase()) ||
-      person.email?.toLowerCase().includes(personSearchTerm.toLowerCase()) ||
       person.phone?.includes(personSearchTerm);
     const matchesPackage = selectedPackageFilter === 'All' || person.packageId === selectedPackageFilter;
-    return matchesSearch && matchesPackage;
+    const matchesCategory =
+      personCategoryFilter === 'All' ||
+      (person.customerCategory || 'New') === personCategoryFilter;
+    return matchesSearch && matchesPackage && matchesCategory;
   });
 
   const personsTotalPages = Math.ceil(filteredPersons.length / personsPageSize) || 1;
@@ -219,7 +251,6 @@ export const PackageList: React.FC = () => {
     personsCurrentPage * personsPageSize
   );
 
-  // Filter packages for catalog
   const filteredPackages = packagesArray
     .filter((pkg) => {
       const query = debouncedSearchTerm.toLowerCase();
@@ -253,8 +284,8 @@ export const PackageList: React.FC = () => {
   const paginatedPackages = filteredPackages.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   if (isLoading) {
-      return <LoadingSpinner text="Loading Packages..." />;
-    }
+    return <LoadingSpinner text="Loading Packages..." />;
+  }
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in">
@@ -465,7 +496,7 @@ export const PackageList: React.FC = () => {
                   type="text"
                   value={personSearchTerm}
                   onChange={(e) => { setPersonSearchTerm(e.target.value); setPersonsCurrentPage(1); }}
-                  placeholder="Search persons by name, email, or phone..."
+                  placeholder="Search persons by name or phone..."
                   className="w-full pl-10 pr-3.5 py-2 rounded-lg border border-[#E2E8F0] text-xs text-[#111827] focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]"
                 />
               </div>
@@ -484,9 +515,20 @@ export const PackageList: React.FC = () => {
                   ))}
                 </select>
               </div>
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={personCategoryFilter}
+                  onChange={(e) => { setPersonCategoryFilter(e.target.value as any); setPersonsCurrentPage(1); }}
+                  className="px-3 py-2 rounded-lg border border-[#E2E8F0] text-xs font-semibold text-[#111827] bg-white focus:outline-none focus:ring-2 focus:ring-[#2D7D6B]"
+                >
+                  <option value="All">All Categories</option>
+                  <option value="New">New</option>
+                  <option value="Customer">Customer</option>
+                  <option value="Regular Customer">Regular Customer</option>
+                </select>
+              </div>
             </div>
 
-            {/* Add Person Button */}
             <div className="flex items-center gap-2">
               <select
                 value={selectedPackageForPerson?.id || ''}
@@ -523,10 +565,9 @@ export const PackageList: React.FC = () => {
               <thead className="bg-[#F9FAFB] text-[#111827] font-bold border-b border-[#E2E8F0]">
                 <tr>
                   <th className="p-3.5 pl-5">Name</th>
-                  <th className="p-3.5">Email</th>
                   <th className="p-3.5">Phone</th>
-                  <th className="p-3.5">Age</th>
                   <th className="p-3.5">Gender</th>
+                  <th className="p-3.5">Customer Category</th>
                   <th className="p-3.5">Package</th>
                   <th className="p-3.5 text-right pr-5">Actions</th>
                 </tr>
@@ -534,7 +575,7 @@ export const PackageList: React.FC = () => {
               <tbody className="divide-y divide-[#E2E8F0] font-medium text-[#2D3748]">
                 {paginatedPersons.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-[#718096]">
+                    <td colSpan={6} className="p-8 text-center text-[#718096]">
                       {allPersons.length === 0 
                         ? 'No persons found. Select a package and click "Add Person".' 
                         : 'No persons match the current search or filter criteria.'}
@@ -551,10 +592,21 @@ export const PackageList: React.FC = () => {
                           <span className="font-bold text-[#111827]">{person.name || 'N/A'}</span>
                         </div>
                       </td>
-                      <td className="p-3.5 text-[#718096]">{person.email || '—'}</td>
                       <td className="p-3.5 text-[#718096]">{person.phone || '—'}</td>
-                      <td className="p-3.5 text-[#718096]">{person.age || '—'}</td>
                       <td className="p-3.5 text-[#718096]">{person.gender || '—'}</td>
+                      <td className="p-3.5">
+                        <select
+                          value={person.customerCategory || 'New'}
+                          onChange={(e) => handleQuickCategoryChange(person, person.packageId, e.target.value as CustomerCategory)}
+                          className={`px-2 py-1 rounded-full text-[10px] font-bold border-0 cursor-pointer ${getCategoryColor(person.customerCategory)}`}
+                        >
+                          {CATEGORY_OPTIONS.map((cat) => (
+                            <option key={cat} value={cat}>
+                              {cat}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
                       <td className="p-3.5">
                         <button
                           onClick={() => navigate(`/packages/${person.packageId}/edit`)}
@@ -619,103 +671,94 @@ export const PackageList: React.FC = () => {
 
       {/* Add Person Modal */}
       {showAddPersonModal && selectedPackageForPerson && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl animate-in fade-in zoom-in duration-200">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-[#111827]">Add Person to {selectedPackageForPerson.titleEn}</h3>
-        <button 
-          onClick={() => {
-            setShowAddPersonModal(false);
-            setNewPerson({ name: '', email: '', phone: '', age: undefined, gender: '' });
-          }} 
-          className="text-[#718096] hover:text-[#111827]"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-      <form onSubmit={handleAddPersonSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-bold text-[#111827] mb-1">Full Name *</label>
-          <input
-            type="text"
-            required
-            value={newPerson.name}
-            onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })}
-            placeholder="Enter full name"
-            className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-[#111827] mb-1">Phone Number *</label>
-          <input
-            type="tel"
-            required
-            value={newPerson.phone}
-            onChange={(e) => setNewPerson({ ...newPerson, phone: e.target.value })}
-            placeholder="+251 91 123 4567"
-            className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
-          />
-          <p className="text-[9px] text-[#718096] mt-1">Required for SMS campaigns</p>
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-[#111827] mb-1">Email (Optional)</label>
-          <input
-            type="email"
-            value={newPerson.email}
-            onChange={(e) => setNewPerson({ ...newPerson, email: e.target.value })}
-            placeholder="email@example.com"
-            className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-bold text-[#111827] mb-1">Age (Optional)</label>
-            <input
-              type="number"
-              min={0}
-              value={newPerson.age || ''}
-              onChange={(e) => setNewPerson({ ...newPerson, age: e.target.value ? parseInt(e.target.value) : undefined })}
-              placeholder="Age"
-              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
-            />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-[#111827]">Add Person to {selectedPackageForPerson.titleEn}</h3>
+              <button 
+                onClick={() => {
+                  setShowAddPersonModal(false);
+                  setNewPerson({ name: '', phone: '', gender: '', customerCategory: 'New' });
+                }} 
+                className="text-[#718096] hover:text-[#111827]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleAddPersonSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#111827] mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={newPerson.name}
+                  onChange={(e) => setNewPerson({ ...newPerson, name: e.target.value })}
+                  placeholder="Enter full name"
+                  className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#111827] mb-1">Phone Number *</label>
+                <input
+                  type="tel"
+                  required
+                  value={newPerson.phone}
+                  onChange={(e) => setNewPerson({ ...newPerson, phone: e.target.value })}
+                  placeholder="+251 91 123 4567"
+                  className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
+                />
+                <p className="text-[9px] text-[#718096] mt-1">Required for SMS campaigns</p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#111827] mb-1">Customer Category *</label>
+                <select
+                  value={newPerson.customerCategory}
+                  onChange={(e) => setNewPerson({ ...newPerson, customerCategory: e.target.value as CustomerCategory })}
+                  className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
+                >
+                  {CATEGORY_OPTIONS.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#111827] mb-1">Gender (Optional)</label>
+                <select
+                  value={newPerson.gender || ''}
+                  onChange={(e) => setNewPerson({ ...newPerson, gender: e.target.value as 'Male' | 'Female' | 'Child' | '' })}
+                  className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
+                >
+                  <option value="">Select</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Child">Child</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isAddingPerson}
+                  className="flex-1 px-4 py-2 rounded-lg bg-[#2D7D6B] hover:bg-[#236355] text-white font-bold text-sm transition-colors disabled:opacity-50"
+                >
+                  {isAddingPerson ? 'Adding...' : 'Add Person'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddPersonModal(false);
+                    setNewPerson({ name: '', phone: '', gender: '', customerCategory: 'New' });
+                  }}
+                  className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#718096] hover:bg-[#F9FAFB] transition-colors text-sm font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
-          <div>
-            <label className="block text-xs font-bold text-[#111827] mb-1">Gender (Optional)</label>
-            <select
-              value={newPerson.gender || ''}
-              onChange={(e) => setNewPerson({ ...newPerson, gender: e.target.value as 'Male' | 'Female' | 'Child' | '' })}
-              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
-            >
-              <option value="">Select</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Child">Child</option>
-            </select>
-          </div>
         </div>
-        <div className="flex items-center gap-3 pt-2">
-          <button
-            type="submit"
-            disabled={isAddingPerson}
-            className="flex-1 px-4 py-2 rounded-lg bg-[#2D7D6B] hover:bg-[#236355] text-white font-bold text-sm transition-colors disabled:opacity-50"
-          >
-            {isAddingPerson ? 'Adding...' : 'Add Person'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShowAddPersonModal(false);
-              setNewPerson({ name: '', email: '', phone: '', age: undefined, gender: '' });
-            }}
-            className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#718096] hover:bg-[#F9FAFB] transition-colors text-sm font-semibold"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
+      )}
 
       <ConfirmModal
         isOpen={!!selectedPackageForDelete}

@@ -1,6 +1,8 @@
 // src/types.ts
 export type UserRole = 'Admin';
 
+export type CustomerCategory = 'New' | 'Customer' | 'Regular Customer';
+
 export interface User {
   id: string;
   username: string;
@@ -264,10 +266,9 @@ export interface Testimonial {
 export interface Person {
   id: string;
   name: string;
-  email?: string;
   phone: string;
-  age?: number;
   gender?: 'Male' | 'Female' | 'Child';
+  customerCategory: CustomerCategory;
   createdAt?: string;
   updatedAt?: string;
 }

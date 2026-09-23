@@ -21,11 +21,43 @@ import {
   Loader2,
   Phone,
   Mail,
-  User,
-  Calendar,
-  Users,
-  MessageSquare,
 } from 'lucide-react';
+
+// ============================================================
+// Dropdown option constants (match the public website)
+// ============================================================
+
+const FROM_OPTIONS = [
+  'Addis Ababa (ADD)',
+  'Other City',
+];
+
+const DESTINATION_OPTIONS = [
+  'Jeddah (JED)',
+  'Madinah (MED)',
+  'Dubai (DXB)',
+  'Istanbul (IST)',
+];
+
+const CABIN_CLASS_OPTIONS = [
+  'Economy Class',
+  'Business Class',
+  'First Class',
+];
+
+// Airline partners — same list as the public website
+// (id, name, code only — no flags, no logo images)
+const AIRLINE_OPTIONS: Array<{ id: string; name: string; code: string }> = [
+  { id: 'ethiopian', name: 'Ethiopian Airlines', code: 'ET' },
+  { id: 'turkish', name: 'Turkish Airlines', code: 'TK' },
+  { id: 'flynas', name: 'Flynas', code: 'XY' },
+  { id: 'emirates', name: 'Emirates', code: 'EK' },
+  { id: 'etihad', name: 'Etihad Airways', code: 'EY' },
+  { id: 'flydubai', name: 'Flydubai', code: 'FZ' },
+  { id: 'qatar', name: 'Qatar Airways', code: 'QR' },
+];
+
+// ============================================================
 
 type TripTypeFilter = 'All' | 'One Way' | 'Round Trip';
 type StatusFilter = 'All' | 'New' | 'Booked' | 'Cancelled';
@@ -36,13 +68,12 @@ const blankForm = {
   fullName: '',
   phone: '',
   email: '',
-  fromCity: 'Addis Ababa (ADD)',
+  fromCity: FROM_OPTIONS[0],
   destination: '',
   departureDate: '',
   returnDate: '',
-  tripType: 'One Way',
   passengers: 1,
-  cabinClass: 'Economy',
+  cabinClass: CABIN_CLASS_OPTIONS[0],
   preferredAirline: '',
   notes: '',
   status: 'New',
@@ -119,13 +150,12 @@ export const FlightInquiries: React.FC = () => {
       fullName: inq.fullName || '',
       phone: inq.phone || '',
       email: inq.email || '',
-      fromCity: inq.fromCity || '',
+      fromCity: inq.fromCity || FROM_OPTIONS[0],
       destination: inq.destination || '',
       departureDate: inq.departureDate || '',
       returnDate: inq.returnDate || '',
-      tripType: inq.returnDate ? 'Round Trip' : 'One Way',
       passengers: inq.passengers || 1,
-      cabinClass: inq.cabinClass || 'Economy',
+      cabinClass: inq.cabinClass || CABIN_CLASS_OPTIONS[0],
       preferredAirline: inq.preferredAirline || '',
       notes: inq.notes || '',
       status: inq.status || 'New',
@@ -144,6 +174,14 @@ export const FlightInquiries: React.FC = () => {
       showToast('error', 'Name and phone are required');
       return;
     }
+    if (!form.destination) {
+      showToast('error', 'Please select a destination');
+      return;
+    }
+    if (!form.preferredAirline) {
+      showToast('error', 'Please select an airline');
+      return;
+    }
 
     const computedTripType = form.returnDate ? 'Round Trip' : 'One Way';
 
@@ -153,8 +191,8 @@ export const FlightInquiries: React.FC = () => {
         fullName: form.fullName.trim(),
         phone: form.phone.trim(),
         email: form.email.trim(),
-        fromCity: form.fromCity.trim(),
-        destination: form.destination.trim(),
+        fromCity: form.fromCity,
+        destination: form.destination,
         departureDate: form.departureDate,
         returnDate: form.returnDate,
         tripType: computedTripType,
@@ -341,7 +379,7 @@ export const FlightInquiries: React.FC = () => {
                     </td>
                     <td className="p-3.5 text-slate-700">{inq.passengers}</td>
                     <td className="p-3.5 text-slate-700">{inq.cabinClass}</td>
-                    <td className="p-3.5 text-slate-600 truncate max-w-[120px]">
+                    <td className="p-3.5 text-slate-600 truncate max-w-[140px]">
                       {inq.preferredAirline || '—'}
                     </td>
                     <td
@@ -468,25 +506,36 @@ export const FlightInquiries: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    From
+                    From *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={form.fromCity}
                     onChange={(e) => setForm({ ...form, fromCity: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E]"
-                  />
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E] bg-white"
+                  >
+                    {FROM_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Destination
+                    Destination *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={form.destination}
                     onChange={(e) => setForm({ ...form, destination: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E]"
-                  />
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E] bg-white"
+                  >
+                    <option value="">Choose a destination...</option>
+                    {DESTINATION_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -510,6 +559,7 @@ export const FlightInquiries: React.FC = () => {
                     type="date"
                     value={form.returnDate}
                     onChange={(e) => setForm({ ...form, returnDate: e.target.value })}
+                    min={form.departureDate || undefined}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E]"
                   />
                 </div>
@@ -537,11 +587,13 @@ export const FlightInquiries: React.FC = () => {
                   <select
                     value={form.cabinClass}
                     onChange={(e) => setForm({ ...form, cabinClass: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E]"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E] bg-white"
                   >
-                    <option value="Economy">Economy</option>
-                    <option value="Business">Business</option>
-                    <option value="First">First</option>
+                    {CABIN_CLASS_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -551,7 +603,7 @@ export const FlightInquiries: React.FC = () => {
                   <select
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E]"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E] bg-white"
                   >
                     {STATUS_OPTIONS.map((s) => (
                       <option key={s} value={s}>
@@ -564,16 +616,22 @@ export const FlightInquiries: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Preferred Airline
+                  Preferred Airline *
                 </label>
-                <input
-                  type="text"
+                <select
                   value={form.preferredAirline}
                   onChange={(e) =>
                     setForm({ ...form, preferredAirline: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E]"
-                />
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#C8102E] bg-white"
+                >
+                  <option value="">Choose an airline...</option>
+                  {AIRLINE_OPTIONS.map((a) => (
+                    <option key={a.id} value={`${a.name} (${a.code})`}>
+                      {a.name} ({a.code})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
