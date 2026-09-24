@@ -43,6 +43,17 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar, onMenuClick }) 
         </button>
 
         <div className="flex items-center gap-2 text-sm font-medium">
+          <div className="w-7 h-7 rounded-md overflow-hidden bg-white border border-[#C8102E]/30 shrink-0 hidden sm:flex items-center justify-center">
+            <img
+              src="/logo/logo.jpg"
+              alt="Delta Travel & Tour"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"%3E%3Crect width="28" height="28" fill="%23C8102E" rx="6"/%3E%3Ctext x="14" y="19" text-anchor="middle" dy=".3em" fill="white" font-size="13" font-family="sans-serif" font-weight="bold"%3E%CE%94%3C/text%3E%3C/svg%3E';
+              }}
+            />
+          </div>
           <span className="text-[#C8102E] font-extrabold hidden sm:inline">Delta Admin</span>
           <ChevronRight className="w-4 h-4 text-white/40 hidden sm:inline" />
           <span className="text-white font-bold tracking-tight">{pageTitle}</span>

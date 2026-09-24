@@ -8,6 +8,8 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isSuperAdmin: boolean;
+  hasPermission: (key: string) => boolean;
   login: (usernameOrEmail: string, password: string) => Promise<void>;
   logout: (message?: string) => void;
 }
@@ -88,6 +90,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast('info', message || 'Logged out successfully');
   };
 
+  // SuperAdmin bypasses per-page permission checks entirely — it's the role
+  // that grants/revokes access for everyone else, so it always has access.
+  const isSuperAdmin = user?.role === 'SuperAdmin';
+
+  const hasPermission = (key: string): boolean => {
+    if (!user) return false;
+    if (isSuperAdmin) return true;
+    return Array.isArray(user.permissions) && user.permissions.includes(key);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -95,6 +107,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         isAuthenticated: !!token && !!user,
         isLoading,
+        isSuperAdmin,
+        hasPermission,
         login,
         logout,
       }}
