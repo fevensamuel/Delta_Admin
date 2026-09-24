@@ -21,6 +21,7 @@ import {
   Phone,
   Music,
   Plane,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -29,35 +30,54 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission, isSuperAdmin } = useAuth();
   const location = useLocation();
 
+  // `permission` maps each nav item to a key from src/config/permissions.ts.
+  // Items with no `permission` (none currently) would always be visible.
   const mainManagementNav = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Package Manager', path: '/packages', icon: Package },
-    { label: 'Gallery Manager', path: '/gallery', icon: ImageIcon },
+    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, permission: 'dashboard' },
+    { label: 'Package Manager', path: '/packages', icon: Package, permission: 'packages' },
+    { label: 'Gallery Manager', path: '/gallery', icon: ImageIcon, permission: 'gallery' },
   ];
 
   const communicationsNav = [
-  { label: 'Inquiries', path: '/inquiries', icon: Mail },
-  { label: 'Flight Inquiries', path: '/flight-inquiries', icon: Plane },
-  { label: 'Subscribers', path: '/subscribers', icon: Users },
-  { label: 'SMS Campaigns', path: '/sms', icon: Send },
-  { label: 'Booking Leads', path: '/leads', icon: BarChart3 },
-];
-
-  const settingsNav = [
-    { label: 'Contact Settings', path: '/settings/contact', icon: Phone },
-    { label: 'Social Media', path: '/settings/social', icon: Share2 },
-    { label: 'Audio / Nasheed', path: '/settings/audio', icon: Music },
-    { label: 'Team Members', path: '/settings/team-members', icon: Users },
-    { label: 'Office Images', path: '/settings/office-images', icon: Building2 },
-    { label: 'Testimonials', path: '/settings/testimonials', icon: Quote },
-    { label: 'FAQs', path: '/settings/faqs', icon: HelpCircle },
-    { label: 'Price Logs', path: '/settings/price-logs', icon: History },
+    { label: 'Inquiries', path: '/inquiries', icon: Mail, permission: 'inquiries' },
+    { label: 'Flight Inquiries', path: '/flight-inquiries', icon: Plane, permission: 'flight-inquiries' },
+    { label: 'Subscribers', path: '/subscribers', icon: Users, permission: 'subscribers' },
+    { label: 'SMS Campaigns', path: '/sms', icon: Send, permission: 'sms' },
+    { label: 'Booking Leads', path: '/leads', icon: BarChart3, permission: 'leads' },
   ];
 
+  const settingsNav = [
+    { label: 'Contact Settings', path: '/settings/contact', icon: Phone, permission: 'settings.contact' },
+    { label: 'Social Media', path: '/settings/social', icon: Share2, permission: 'settings.social' },
+    { label: 'Audio / Nasheed', path: '/settings/audio', icon: Music, permission: 'settings.audio' },
+    { label: 'Team Members', path: '/settings/team-members', icon: Users, permission: 'settings.team-members' },
+    { label: 'Office Images', path: '/settings/office-images', icon: Building2, permission: 'settings.office-images' },
+    { label: 'Testimonials', path: '/settings/testimonials', icon: Quote, permission: 'settings.testimonials' },
+    { label: 'FAQs', path: '/settings/faqs', icon: HelpCircle, permission: 'settings.faqs' },
+    { label: 'Price Logs', path: '/settings/price-logs', icon: History, permission: 'settings.price-logs' },
+  ];
+
+  // SuperAdmin-only: manage other admins' accounts and page access.
+  const adminNav = isSuperAdmin
+    ? [{ label: 'Admin Users', path: '/settings/admin-users', icon: ShieldCheck, permission: null as string | null }]
+    : [];
+
+  const filterByAccess = (items: Array<{ label: string; path: string; icon: any; permission: string | null }>) =>
+    items.filter((item) => item.permission === null || hasPermission(item.permission));
+
   const renderNavGroup = (
+    title: string,
+    items: Array<{ label: string; path: string; icon: any; permission: string | null }>
+  ) => {
+    const visibleItems = filterByAccess(items);
+    if (visibleItems.length === 0) return null;
+    return renderNavGroupItems(title, visibleItems);
+  };
+
+  const renderNavGroupItems = (
     title: string,
     items: Array<{ label: string; path: string; icon: any }>
   ) => (
@@ -146,6 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           {renderNavGroup('Main Management', mainManagementNav)}
           {renderNavGroup('Communications & Leads', communicationsNav)}
           {renderNavGroup('Settings', settingsNav)}
+          {adminNav.length > 0 && renderNavGroupItems('Administration', adminNav)}
         </nav>
 
         <div className="p-4 bg-[#0F172A] border-t border-[#ffffff15]">
@@ -159,7 +180,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               <p className="text-xs font-bold text-white truncate">
                 {user?.username || 'Admin'}
               </p>
-              <p className="text-[10px] text-[#FC8181] uppercase font-bold">Admin</p>
+              <p className="text-[10px] text-[#FC8181] uppercase font-bold">
+                {isSuperAdmin ? 'Super Admin' : 'Admin'}
+              </p>
             </div>
             <button
               onClick={() => logout('Logged out successfully')}

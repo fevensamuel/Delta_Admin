@@ -1,5 +1,8 @@
 // src/types.ts
-export type UserRole = 'Admin';
+export type UserRole = 'SuperAdmin' | 'Admin';
+
+// Keys must match the `id` values defined in src/config/permissions.ts
+export type PermissionKey = string;
 
 export type CustomerCategory = 'New' | 'Customer' | 'Regular Customer';
 
@@ -10,8 +13,29 @@ export interface User {
   role: UserRole;
   status: 'Active' | 'Inactive';
   isActive?: boolean;
+  // Page/module access keys granted to this admin. Ignored (full access) when role is 'SuperAdmin'.
+  permissions?: PermissionKey[];
   lastLogin?: string;
   createdAt: string;
+}
+
+// Shape used by the SuperAdmin's "Admin Users" screen when creating a new admin
+export interface CreateAdminPayload {
+  username: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  permissions: PermissionKey[];
+}
+
+// Shape used when a SuperAdmin edits an existing admin's profile/permissions
+export interface UpdateAdminPayload {
+  username?: string;
+  email?: string;
+  password?: string;
+  role?: UserRole;
+  permissions?: PermissionKey[];
+  isActive?: boolean;
 }
 
 export interface AuthState {
