@@ -1,9 +1,11 @@
+// src/pages/subscribers/SubscriberManager.tsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Subscriber, Package } from '../../types';
 import {
   getSubscribersApi,
   updateSubscriberStatusApi,
+  updateSubscriberApi,
   deleteSubscriberApi,
   bulkDeleteSubscribersApi,
   bulkImportSubscribersApi,
@@ -22,30 +24,63 @@ import {
   Download,
   Upload,
   Trash2,
-  PhoneCall,
-  Mail,
-  UserX,
   Send,
-  Package as PackageIcon,
   Plus,
   UserPlus,
-  X
+  X,
+  Edit,
+  ArrowUpDown,
+  Loader2
 } from 'lucide-react';
 
-interface AddSubscriberModalProps {
+// ============================================================
+// ADD / EDIT SUBSCRIBER MODAL
+// ============================================================
+interface SubscriberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (subscriber: Omit<Subscriber, 'id' | 'dateSubscribed'>) => Promise<void>;
+  onSubmit: (data: Omit<Subscriber, 'id' | 'dateSubscribed'>) => Promise<void>;
+  initialData?: Subscriber | null;
+  mode: 'add' | 'edit';
 }
 
-const AddSubscriberModal: React.FC<AddSubscriberModalProps> = ({ isOpen, onClose, onAdd }) => {
+const SubscriberModal: React.FC<SubscriberModalProps> = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  initialData,
+  mode
+}) => {
   const { showToast } = useToast();
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [channel, setChannel] = useState('Social Media');
   const [packageInterest, setPackageInterest] = useState('');
+  const [optInStatus, setOptInStatus] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reset form when modal opens / initialData changes
+  useEffect(() => {
+    if (!isOpen) return;
+    if (mode === 'edit' && initialData) {
+      setPhone(initialData.phone || '');
+      setEmail(initialData.email || '');
+      setName(initialData.name || '');
+      setChannel(initialData.channel || 'Social Media');
+      setPackageInterest(initialData.packageInterest || '');
+      setOptInStatus(
+        initialData.optInStatus === 'Active' || initialData.optInStatus === true
+      );
+    } else {
+      setPhone('');
+      setEmail('');
+      setName('');
+      setChannel('Social Media');
+      setPackageInterest('');
+      setOptInStatus(true);
+    }
+  }, [isOpen, mode, initialData]);
 
   if (!isOpen) return null;
 
@@ -57,23 +92,17 @@ const AddSubscriberModal: React.FC<AddSubscriberModalProps> = ({ isOpen, onClose
     }
     setIsSubmitting(true);
     try {
-      await onAdd({
+      await onSubmit({
         phone: phone.trim(),
         email: email.trim() || '',
         name: name.trim() || '',
-        channel: channel,
+        channel,
         packageInterest: packageInterest || '',
-        optInStatus: true
-      });
-      // Reset form after successful submission
-      setPhone('');
-      setEmail('');
-      setName('');
-      setChannel('Social Media');
-      setPackageInterest('');
+        optInStatus: optInStatus ? 'Active' : 'Opt-out'
+      } as any);
       onClose();
-    } catch (error) {
-      showToast('error', 'Failed to add subscriber');
+    } catch (error: any) {
+      showToast('error', error?.message || `Failed to ${mode} subscriber`);
     } finally {
       setIsSubmitting(false);
     }
@@ -83,7 +112,9 @@ const AddSubscriberModal: React.FC<AddSubscriberModalProps> = ({ isOpen, onClose
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-[#111827]">Add Subscriber</h3>
+          <h3 className="text-lg font-bold text-[#111827]">
+            {mode === 'edit' ? 'Edit Subscriber' : 'Add Subscriber'}
+          </h3>
           <button onClick={onClose} className="text-[#718096] hover:text-[#111827]">
             <X className="w-5 h-5" />
           </button>
@@ -129,9 +160,10 @@ const AddSubscriberModal: React.FC<AddSubscriberModalProps> = ({ isOpen, onClose
             >
               <option value="Social Media">Social Media</option>
               <option value="WhatsApp">WhatsApp</option>
+              <option value="Web Banner">Web Banner</option>
               <option value="Direct">Direct</option>
               <option value="Others">Others</option>
-              <option value="Bulk Import">Bulk Import</option>
+              {/* ✅ 'Bulk Import' intentionally removed — only set by the import process */}
             </select>
           </div>
           <div>
@@ -144,13 +176,28 @@ const AddSubscriberModal: React.FC<AddSubscriberModalProps> = ({ isOpen, onClose
               className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
             />
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="optInStatus"
+              checked={optInStatus}
+              onChange={(e) => setOptInStatus(e.target.checked)}
+              className="w-4 h-4 rounded text-[#C8102E] focus:ring-[#C8102E]"
+            />
+            <label htmlFor="optInStatus" className="text-xs font-medium text-[#4A5568]">
+              Opt-in (allowed to receive SMS)
+            </label>
+          </div>
           <div className="flex items-center gap-3 pt-2">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 px-4 py-2 rounded-lg bg-[#C8102E] hover:bg-[#A00D24] text-white font-bold text-sm transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 rounded-lg bg-[#C8102E] hover:bg-[#A00D24] text-white font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isSubmitting ? 'Adding...' : 'Add Subscriber'}
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isSubmitting
+                ? mode === 'edit' ? 'Saving...' : 'Adding...'
+                : mode === 'edit' ? 'Save Changes' : 'Add Subscriber'}
             </button>
             <button
               type="button"
@@ -166,6 +213,11 @@ const AddSubscriberModal: React.FC<AddSubscriberModalProps> = ({ isOpen, onClose
   );
 };
 
+// ============================================================
+// MAIN PAGE
+// ============================================================
+type SortOrder = 'newest' | 'oldest';
+
 export const SubscriberManager: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -180,14 +232,19 @@ export const SubscriberManager: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [packageFilter, setPackageFilter] = useState('All');
 
-  // Multi-select for bulk action
+  // ✅ Sort order (default: newest first)
+  const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
+
+  // Multi-select
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Modals
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingSubscriber, setEditingSubscriber] = useState<Subscriber | null>(null);
 
-  // Confirm delete modal
+  // Delete
   const [subToDelete, setSubToDelete] = useState<Subscriber | null>(null);
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -215,20 +272,22 @@ export const SubscriberManager: React.FC = () => {
     }
   };
 
-  const handleAddSubscriber = async (subscriberData: Omit<Subscriber, 'id' | 'dateSubscribed'>) => {
-    try {
-      await createSubscriberApi(subscriberData);
-      showToast('success', 'Subscriber added successfully');
-      // Refresh the list to show the new subscriber
-      await loadSubscribers();
-    } catch (error) {
-      console.error('Error adding subscriber:', error);
-      throw error;
-    }
+  const handleAddSubscriber = async (data: Omit<Subscriber, 'id' | 'dateSubscribed'>) => {
+    await createSubscriberApi(data);
+    showToast('success', 'Subscriber added successfully');
+    await loadSubscribers();
+  };
+
+  const handleEditSubscriber = async (data: Omit<Subscriber, 'id' | 'dateSubscribed'>) => {
+    if (!editingSubscriber) return;
+    await updateSubscriberApi(editingSubscriber.id, data as Partial<Subscriber>);
+    showToast('success', 'Subscriber updated successfully');
+    setEditingSubscriber(null);
+    await loadSubscribers();
   };
 
   const isActiveSubscriber = (sub: Subscriber) => {
-    return sub.optInStatus === 'Active' || sub.optInStatus === true;
+    return sub.optInStatus === 'Active' || (sub.optInStatus as any) === true;
   };
 
   const handleToggleOptStatus = async (sub: Subscriber) => {
@@ -292,11 +351,16 @@ export const SubscriberManager: React.FC = () => {
       s.dateSubscribed || new Date().toISOString().split('T')[0]
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `delta_subscribers_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute(
+      'download',
+      `delta_subscribers_${new Date().toISOString().substring(0, 10)}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -306,15 +370,17 @@ export const SubscriberManager: React.FC = () => {
 
   const getFilteredSubscribers = () => {
     const subscribersArray = ensureArray<Subscriber>(subscribers);
-    return subscribersArray.filter((sub) => {
+
+    const filtered = subscribersArray.filter((sub) => {
       const matchesSearch =
         sub.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (sub.email && sub.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (sub.name && sub.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (sub.packageInterest && sub.packageInterest.toLowerCase().includes(searchTerm.toLowerCase()));
-      
+        (sub.packageInterest &&
+          sub.packageInterest.toLowerCase().includes(searchTerm.toLowerCase()));
+
       const matchesChannel = channelFilter === 'All' || sub.channel === channelFilter;
-      
+
       let matchesStatus = true;
       if (statusFilter === 'Active') {
         matchesStatus = isActiveSubscriber(sub);
@@ -330,11 +396,23 @@ export const SubscriberManager: React.FC = () => {
 
       return matchesSearch && matchesChannel && matchesStatus && matchesPackage;
     });
+
+    // ✅ Sort by date (ascending or descending)
+    const sorted = [...filtered].sort((a, b) => {
+      const dateA = new Date(a.createdAt || a.dateSubscribed || 0).getTime();
+      const dateB = new Date(b.createdAt || b.dateSubscribed || 0).getTime();
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+
+    return sorted;
   };
 
   const filteredSubscribers = getFilteredSubscribers();
   const totalPages = Math.ceil(filteredSubscribers.length / pageSize) || 1;
-  const paginatedSubscribers = filteredSubscribers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const paginatedSubscribers = filteredSubscribers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -345,7 +423,9 @@ export const SubscriberManager: React.FC = () => {
   };
 
   const handleToggleSelectOne = (id: string) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
   };
 
   if (isLoading) {
@@ -358,7 +438,9 @@ export const SubscriberManager: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold text-slate-900">SMS Subscriber Database</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Manage opt-in subscribers, WhatsApp marketing leads, and CSV bulk uploads.</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Manage opt-in subscribers, WhatsApp marketing leads, and CSV bulk uploads.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -392,11 +474,15 @@ export const SubscriberManager: React.FC = () => {
           <p className="text-xs text-slate-500">Total Subscribers</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <p className="text-2xl font-black text-emerald-600">{subscribers.filter(s => isActiveSubscriber(s)).length}</p>
+          <p className="text-2xl font-black text-emerald-600">
+            {subscribers.filter((s) => isActiveSubscriber(s)).length}
+          </p>
           <p className="text-xs text-slate-500">Active Opt-in</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <p className="text-2xl font-black text-rose-600">{subscribers.filter(s => !isActiveSubscriber(s)).length}</p>
+          <p className="text-2xl font-black text-rose-600">
+            {subscribers.filter((s) => !isActiveSubscriber(s)).length}
+          </p>
           <p className="text-xs text-slate-500">Opt-out</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
@@ -421,6 +507,21 @@ export const SubscriberManager: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-2">
             <Filter className="w-4 h-4 text-slate-500" />
+
+            {/* ✅ Sort dropdown */}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-xl border border-slate-300 bg-white">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                className="text-xs font-bold text-[#1A5B4B] bg-transparent focus:outline-none"
+                title="Sort by date added"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </div>
+
             <select
               value={packageFilter}
               onChange={(e) => setPackageFilter(e.target.value)}
@@ -460,10 +561,11 @@ export const SubscriberManager: React.FC = () => {
           </div>
         </div>
 
-        {/* Bulk Action Controls */}
         {selectedIds.length > 0 && (
           <div className="flex items-center gap-2 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200">
-            <span className="text-xs font-bold text-rose-800">{selectedIds.length} Selected</span>
+            <span className="text-xs font-bold text-rose-800">
+              {selectedIds.length} Selected
+            </span>
             <button
               onClick={() => setIsBulkDeleteModalOpen(true)}
               className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors flex items-center gap-1"
@@ -474,7 +576,7 @@ export const SubscriberManager: React.FC = () => {
         )}
       </div>
 
-      {/* Table View */}
+      {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -484,7 +586,10 @@ export const SubscriberManager: React.FC = () => {
                   <input
                     type="checkbox"
                     onChange={handleSelectAll}
-                    checked={selectedIds.length > 0 && selectedIds.length === paginatedSubscribers.length}
+                    checked={
+                      selectedIds.length > 0 &&
+                      selectedIds.length === paginatedSubscribers.length
+                    }
                     className="w-4 h-4 rounded text-[#1A5B4B]"
                   />
                 </th>
@@ -521,13 +626,9 @@ export const SubscriberManager: React.FC = () => {
                       {sub.phone || 'N/A'}
                     </td>
 
-                    <td className="p-3.5 text-slate-700">
-                      {sub.name || '—'}
-                    </td>
+                    <td className="p-3.5 text-slate-700">{sub.name || '—'}</td>
 
-                    <td className="p-3.5 text-slate-600">
-                      {sub.email || '—'}
-                    </td>
+                    <td className="p-3.5 text-slate-600">{sub.email || '—'}</td>
 
                     <td className="p-3.5">
                       <span className="px-2 py-0.5 rounded bg-slate-100 font-semibold text-slate-700 text-[11px]">
@@ -557,6 +658,18 @@ export const SubscriberManager: React.FC = () => {
 
                     <td className="p-3.5 pr-5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {/* ✅ Edit button */}
+                        <button
+                          onClick={() => {
+                            setEditingSubscriber(sub);
+                            setIsEditModalOpen(true);
+                          }}
+                          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
+                          title="Edit subscriber"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-[#1A5B4B]" />
+                        </button>
+
                         {sub.packageInterest && (
                           <button
                             onClick={() =>
@@ -565,7 +678,7 @@ export const SubscriberManager: React.FC = () => {
                               })
                             }
                             className="p-1.5 rounded-lg border border-slate-200 hover:bg-[#1A5B4B]/10 text-[#1A5B4B] transition-colors"
-                            title={`Compose SMS for ${sub.packageInterest} Subscribers`}
+                            title="Compose SMS for this package"
                           >
                             <Send className="w-3.5 h-3.5" />
                           </button>
@@ -576,7 +689,7 @@ export const SubscriberManager: React.FC = () => {
                           className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
                           title={isActiveSubscriber(sub) ? 'Mark as Opt-out' : 'Mark as Active'}
                         >
-                          <UserX className="w-3.5 h-3.5 text-amber-600" />
+                          <X className="w-3.5 h-3.5 text-amber-600" />
                         </button>
 
                         <button
@@ -595,11 +708,12 @@ export const SubscriberManager: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination Bar */}
+        {/* Pagination */}
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-600">
           <span>
             Showing {filteredSubscribers.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{' '}
-            {Math.min(currentPage * pageSize, filteredSubscribers.length)} of {filteredSubscribers.length} contacts
+            {Math.min(currentPage * pageSize, filteredSubscribers.length)} of{' '}
+            {filteredSubscribers.length} contacts
           </span>
 
           <div className="flex items-center gap-1.5">
@@ -635,10 +749,22 @@ export const SubscriberManager: React.FC = () => {
         }}
       />
 
-      <AddSubscriberModal
+      <SubscriberModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onAdd={handleAddSubscriber}
+        onSubmit={handleAddSubscriber}
+        mode="add"
+      />
+
+      <SubscriberModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingSubscriber(null);
+        }}
+        onSubmit={handleEditSubscriber}
+        initialData={editingSubscriber}
+        mode="edit"
       />
 
       <ConfirmModal

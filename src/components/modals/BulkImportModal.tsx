@@ -1,25 +1,33 @@
+// src/components/modals/BulkImportModal.tsx
 import React, { useState } from 'react';
-import { FileSpreadsheet, Upload, X, Check, AlertCircle } from 'lucide-react';
+import { FileSpreadsheet, Upload, X } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { Subscriber } from '../../types';
 
 interface BulkImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (subscribers: Omit<Subscriber, 'id' | 'dateSubscribed'>[]) => Promise<{ added: number; updated: number }>;
+  onImport: (
+    subscribers: Omit<Subscriber, 'id' | 'dateSubscribed'>[]
+  ) => Promise<{ added: number; updated: number }>;
   isLoading?: boolean;
+}
+
+interface ParsedRow {
+  phone: string;
+  name: string;
+  email: string;
 }
 
 export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   isOpen,
   onClose,
   onImport,
-  isLoading
+  isLoading,
 }) => {
   const { showToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
-  const [parsedRows, setParsedRows] = useState<{ phone: string; email: string; channel: string; interest: string }[]>([]);
-  const [duplicateStrategy, setDuplicateStrategy] = useState<'update' | 'skip'>('update');
+  const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
 
   if (!isOpen) return null;
 
@@ -31,28 +39,69 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
     }
   };
 
+  /**
+   * ✅ Smart CSV parser:
+   *   - Detects columns by header name: phone, name, email (order-agnostic)
+   *   - Falls back to defaults: col 1 = phone, col 2 = name, col 3 = email
+   *   - Handles quoted values with commas inside
+   *   - Handles scientific notation like 9.74E+08 by restoring as a plain string
+   *   - Skips blank rows and row 1 if it's a header
+   */
   const parseCsv = (file: File) => {
     const reader = new FileReader();
     reader.onload = (evt) => {
-      const content = evt.target?.result as string;
+      const content = (evt.target?.result as string) || '';
       if (!content) return;
 
-      const lines = content.split('\n').filter((line) => line.trim().length > 0);
-      const rows: { phone: string; email: string; channel: string; interest: string }[] = [];
+      // Split lines (handle \r\n and \n)
+      const rawLines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
+      if (rawLines.length === 0) {
+        showToast('error', 'CSV file is empty');
+        return;
+      }
 
-      lines.forEach((line, index) => {
-        // Skip header if first line has 'phone'
-        if (index === 0 && line.toLowerCase().includes('phone')) return;
-        const parts = line.split(',').map((p) => p.trim().replace(/^["']|["']$/g, ''));
-        if (parts[0]) {
-          rows.push({
-            phone: parts[0],
-            email: parts[1] || '',
-            channel: parts[2] || 'Direct',
-            interest: parts[3] || 'General Umrah Offers'
-          });
-        }
-      });
+      // --- Parse header (if present) ---
+      const firstLineCells = splitCsvLine(rawLines[0]);
+      const headerLower = firstLineCells.map((c) => c.trim().toLowerCase());
+
+      const looksLikeHeader = headerLower.some((h) =>
+        ['phone', 'name', 'email', 'fullname', 'full_name', 'mobile', 'telephone'].includes(h)
+      );
+
+      let phoneIdx = 0;
+      let nameIdx = 1;
+      let emailIdx = 2;
+
+      if (looksLikeHeader) {
+        headerLower.forEach((h, i) => {
+          if (['phone', 'mobile', 'telephone', 'phone_number', 'phone number'].includes(h)) phoneIdx = i;
+          else if (['name', 'fullname', 'full_name', 'full name'].includes(h)) nameIdx = i;
+          else if (['email', 'e-mail', 'email_address'].includes(h)) emailIdx = i;
+        });
+      }
+
+      const startRow = looksLikeHeader ? 1 : 0;
+      const rows: ParsedRow[] = [];
+      const seenPhones = new Set<string>();
+
+      for (let i = startRow; i < rawLines.length; i++) {
+        const cells = splitCsvLine(rawLines[i]);
+        const rawPhone = (cells[phoneIdx] || '').trim();
+        if (!rawPhone) continue;
+
+        const phone = normalizePhone(rawPhone);
+        if (!phone) continue;
+
+        // Skip duplicates within the same file
+        if (seenPhones.has(phone)) continue;
+        seenPhones.add(phone);
+
+        rows.push({
+          phone,
+          name: (cells[nameIdx] || '').trim(),
+          email: (cells[emailIdx] || '').trim(),
+        });
+      }
 
       if (rows.length === 0) {
         setParsedRows([]);
@@ -65,6 +114,64 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
     reader.readAsText(file);
   };
 
+  /**
+   * Split a CSV line into cells, respecting quotes.
+   * Handles: a,b,c → [a,b,c]  and  "a,b",c → ["a,b",c]
+   */
+  const splitCsvLine = (line: string): string[] => {
+    const cells: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        inQuotes = !inQuotes;
+      } else if (ch === ',' && !inQuotes) {
+        cells.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    cells.push(current);
+    return cells.map((c) => c.replace(/^["']|["']$/g, '').trim());
+  };
+
+  /**
+   * ✅ Recover scientific notation and normalize phone format.
+   *   - "9.74E+08"      → attempts numeric expansion → "974000000"
+   *   - "+251974123456" → "+251974123456"
+   *   - "0974..."       → "+251974..."
+   *   - "974123456"     → "+251974123456"
+   */
+  const normalizePhone = (raw: string): string => {
+    let value = raw.trim();
+
+    // Handle scientific notation (Excel corruption)
+    if (/^\d+(\.\d+)?[eE]\+?\d+$/.test(value) || /^\d+(\.\d+)?[eE]-?\d+$/.test(value)) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        // Best-effort expansion (may still be lossy if Excel truncated digits)
+        value = numeric.toFixed(0);
+      }
+    }
+
+    // Strip non-digit chars except leading +
+    let digits = value.replace(/[^\d]/g, '');
+
+    // Normalize to international format with +251 prefix
+    if (digits.startsWith('251')) {
+      return '+' + digits;
+    }
+    if (digits.startsWith('0')) {
+      return '+251' + digits.slice(1);
+    }
+    if (digits.length >= 9) {
+      return '+251' + digits;
+    }
+    return digits ? '+251' + digits : '';
+  };
+
   const handleRunImport = async () => {
     if (parsedRows.length === 0) {
       showToast('error', 'No valid subscribers to import');
@@ -72,19 +179,22 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
     }
 
     try {
+      // ✅ Set channel to 'Bulk Import' on every row + include name
       const subscribersData = parsedRows.map((r) => ({
         phone: r.phone,
-        email: r.email,
-        channel: (r.channel as any) || 'Direct',
-        packageInterest: r.interest,
-        optInStatus: 'Active' as const
+        name: r.name || '',
+        email: r.email || '',
+        channel: 'Bulk Import',
+        packageInterest: '',
+        optInStatus: 'Active' as const,
       }));
 
       const res = await onImport(subscribersData);
       showToast('success', `Import complete! Added: ${res.added}, Updated: ${res.updated}`);
       onClose();
-    } catch {
-      showToast('error', 'Failed to import subscribers');
+    } catch (err: any) {
+      console.error('Bulk import error:', err);
+      showToast('error', err?.message || 'Failed to import subscribers');
     }
   };
 
@@ -102,11 +212,12 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
         </div>
 
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
-          {/* Upload Area */}
           <div className="border-2 border-dashed border-slate-300 hover:border-[#1A5B4B] rounded-2xl p-6 text-center bg-slate-50/50 transition-colors">
             <Upload className="w-8 h-8 text-[#1A5B4B] mx-auto mb-2" />
             <p className="text-sm font-semibold text-slate-800">Upload CSV File</p>
-            <p className="text-xs text-slate-500 mt-0.5">Columns: Phone, Email, Channel, Package Interest</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Expected columns: <span className="font-mono">phone, name, email</span> (any order)
+            </p>
 
             <input
               type="file"
@@ -121,29 +232,29 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
             >
               Select CSV File
             </label>
+            {file && (
+              <p className="mt-2 text-[11px] text-slate-500 font-mono truncate">
+                {file.name} ({(file.size / 1024).toFixed(1)} KB)
+              </p>
+            )}
           </div>
 
-          {/* Duplicate Strategy */}
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-800">Duplicate Phone Number Handling</p>
-              <p className="text-[11px] text-slate-500">Choose action when phone number already exists in database</p>
-            </div>
-            <select
-              value={duplicateStrategy}
-              onChange={(e) => setDuplicateStrategy(e.target.value as any)}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold bg-white"
-            >
-              <option value="update">Update existing record</option>
-              <option value="skip">Skip duplicate</option>
-            </select>
+          <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900">
+            <p className="font-bold mb-1">💡 How it works</p>
+            <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+              <li>Every subscriber imported here gets the channel <strong>Bulk Import</strong></li>
+              <li>Phone numbers are automatically normalized (e.g. <span className="font-mono">0974...</span> → <span className="font-mono">+251974...</span>)</li>
+              <li>Duplicate phones within the file are skipped</li>
+              <li>Duplicate phones against the database are <strong>updated</strong> (not duplicated)</li>
+            </ul>
           </div>
 
-          {/* Mapping Preview Table */}
           {parsedRows.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800">Parsed Data Preview ({parsedRows.length} contacts)</span>
+                <span className="text-xs font-bold text-slate-800">
+                  Parsed Data Preview ({parsedRows.length} contacts)
+                </span>
                 <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                   Ready to Import
                 </span>
@@ -151,21 +262,19 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
               <div className="border border-slate-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-700 font-bold border-b">
+                  <thead className="bg-slate-100 text-slate-700 font-bold border-b sticky top-0">
                     <tr>
                       <th className="p-2.5">Phone</th>
+                      <th className="p-2.5">Name</th>
                       <th className="p-2.5">Email</th>
-                      <th className="p-2.5">Channel</th>
-                      <th className="p-2.5">Package Interest</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
                     {parsedRows.map((row, idx) => (
                       <tr key={idx} className="hover:bg-slate-50">
                         <td className="p-2.5 font-mono">{row.phone}</td>
+                        <td className="p-2.5">{row.name || '—'}</td>
                         <td className="p-2.5">{row.email || '—'}</td>
-                        <td className="p-2.5">{row.channel}</td>
-                        <td className="p-2.5 truncate max-w-xs">{row.interest}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -12,7 +12,9 @@ export async function getSubscribersApi(): Promise<Subscriber[]> {
   }
 }
 
-export async function bulkImportSubscribersApi(subscribers: Omit<Subscriber, 'id' | 'dateSubscribed'>[]): Promise<{ added: number; updated: number }> {
+export async function bulkImportSubscribersApi(
+  subscribers: Omit<Subscriber, 'id' | 'dateSubscribed'>[]
+): Promise<{ added: number; updated: number }> {
   try {
     const res = await apiClient.post('/admin/subscribers/bulk', { subscribers });
     return res.data?.data || res.data;
@@ -21,12 +23,31 @@ export async function bulkImportSubscribersApi(subscribers: Omit<Subscriber, 'id
   }
 }
 
-export async function updateSubscriberStatusApi(id: string, optInStatus: boolean): Promise<Subscriber> {
+export async function updateSubscriberStatusApi(
+  id: string,
+  optInStatus: boolean
+): Promise<Subscriber> {
   try {
     const res = await apiClient.put(`/admin/subscribers/${id}`, { optInStatus });
     return res.data?.data || res.data;
   } catch (error) {
     throw new Error((error as Error)?.message || 'Failed to update subscriber status');
+  }
+}
+
+/**
+ * ✅ NEW: Update any subscriber fields (name, email, phone, channel, packageInterest, optInStatus)
+ */
+export async function updateSubscriberApi(
+  id: string,
+  data: Partial<Subscriber>
+): Promise<Subscriber> {
+  try {
+    const res = await apiClient.put(`/admin/subscribers/${id}`, data);
+    return res.data?.data || res.data;
+  } catch (error: any) {
+    console.error('❌ Error updating subscriber:', error);
+    throw new Error(error?.response?.data?.error || 'Failed to update subscriber');
   }
 }
 
@@ -39,17 +60,18 @@ export async function deleteSubscriberApi(id: string): Promise<void> {
   }
 }
 
-// BULK DELETE subscribers - FIXED
+// BULK DELETE subscribers
 export async function bulkDeleteSubscribersApi(ids: string[]): Promise<void> {
   try {
-    // Using data: { ids } to send in request body
     await apiClient.delete('/admin/subscribers/bulk-delete', { data: { ids } });
   } catch (error) {
     throw new Error((error as Error)?.message || 'Failed to bulk delete subscribers');
   }
 }
 
-export async function createSubscriberApi(data: Omit<Subscriber, 'id' | 'dateSubscribed'>): Promise<Subscriber> {
+export async function createSubscriberApi(
+  data: Omit<Subscriber, 'id' | 'dateSubscribed'>
+): Promise<Subscriber> {
   try {
     const res = await apiClient.post('/admin/subscribers', data);
     return res.data?.data || res.data;
@@ -60,3 +82,4 @@ export async function createSubscriberApi(data: Omit<Subscriber, 'id' | 'dateSub
 }
 
 export const bulkImportSubscribers = bulkImportSubscribersApi;
+export const updateSubscriber = updateSubscriberApi;
