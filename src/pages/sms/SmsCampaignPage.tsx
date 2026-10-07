@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { SmsCampaign, Subscriber, Package } from '../../types';
 import { getCampaignsApi, sendSmsCampaignApi } from '../../api/sms';
 import { getSubscribersApi } from '../../api/subscribers';
@@ -23,6 +23,7 @@ import {
 export const SmsCampaignPage: React.FC = () => {
   const { showToast } = useToast();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -49,18 +50,18 @@ export const SmsCampaignPage: React.FC = () => {
     loadData();
   }, []);
 
-  // Handle incoming route state or query params for pre-selected package
+  // ✅ Handle incoming packageId from SubscriberManager (?packageId=xxx)
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const paramPkg = location.state?.targetFilter || searchParams.get('package');
-    if (paramPkg) {
-      if (paramPkg.startsWith('Package:')) {
-        setTargetFilter(paramPkg);
-      } else {
-        setTargetFilter(`Package: ${paramPkg}`);
+    const pkgId = searchParams.get('packageId');
+    if (pkgId && packages.length > 0) {
+      const pkg = packages.find((p) => p.id === pkgId);
+      if (pkg) {
+        setRecipientType('subscribers');
+        // Use ID-based targetFilter
+        setTargetFilter(`Package:${pkgId}`);
       }
     }
-  }, [location.state, location.search]);
+  }, [searchParams, packages]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -70,11 +71,11 @@ export const SmsCampaignPage: React.FC = () => {
         getSubscribersApi(),
         getPackagesApi()
       ]);
-      
+
       const campaignData = Array.isArray(cData) ? cData : [];
       const subscriberData = Array.isArray(sData) ? sData : [];
       const packageData = Array.isArray(pData) ? pData : [];
-      
+
       setCampaigns(campaignData);
       setSubscribers(subscriberData);
       setPackages(packageData);
@@ -94,29 +95,25 @@ export const SmsCampaignPage: React.FC = () => {
     return sub.optInStatus === 'Active' || sub.optInStatus === true;
   };
 
-  // Helper to match subscribers to a specific package
-  const getSubscribersForPackage = (pkgTitle: string) => {
-    const cleanPkgName = pkgTitle.replace(/^Package:\s*/i, '').trim().toLowerCase();
-    return subscribers.filter((s) => {
-      if (!s.packageInterest) return false;
-      const interest = s.packageInterest.toLowerCase();
-      return interest.includes(cleanPkgName) || cleanPkgName.includes(interest);
-    });
+  // ✅ Match subscribers by package ID (exact match)
+  const getSubscribersForPackageId = (pkgId: string) => {
+    return subscribers.filter((s) => s.packageInterestId === pkgId);
   };
 
   // Get persons from a specific package
   const getPersonsForPackage = (pkgId: string) => {
-    const pkg = packages.find(p => p.id === pkgId);
-    if (!pkg || !pkg.persons) return [];
-    return pkg.persons.filter(p => p.phone);
+    const pkg = packages.find((p) => p.id === pkgId);
+    if (!pkg || !(pkg as any).persons) return [];
+    return (pkg as any).persons.filter((p: any) => p.phone);
   };
 
   // Get all persons from all packages
   const getAllPersons = () => {
     const allPersons: any[] = [];
-    packages.forEach(pkg => {
-      if (pkg.persons && Array.isArray(pkg.persons)) {
-        pkg.persons.forEach((person: any) => {
+    packages.forEach((pkg) => {
+      const persons = (pkg as any).persons;
+      if (persons && Array.isArray(persons)) {
+        persons.forEach((person: any) => {
           if (person.phone) {
             allPersons.push({
               ...person,
@@ -144,23 +141,25 @@ export const SmsCampaignPage: React.FC = () => {
       return subscribers.length;
     }
     if (targetFilter === 'Active Opt-in') {
-      return subscribers.filter(s => isActiveSubscriber(s)).length;
+      return subscribers.filter((s) => isActiveSubscriber(s)).length;
     }
     if (targetFilter === 'Package-specific') {
-      return subscribers.filter((s) => s.packageInterest).length;
+      return subscribers.filter((s) => s.packageInterestId).length;
     }
     if (targetFilter === 'Manual Numbers') {
       const numbers = manualNumbers.split(/[\n,;]+/).filter((n) => n.trim().length > 0);
       return numbers.length;
     }
+    // ✅ targetFilter format: "Package:<id>"
     if (targetFilter.startsWith('Package:')) {
-      return getSubscribersForPackage(targetFilter).length;
+      const pkgId = targetFilter.slice('Package:'.length);
+      return getSubscribersForPackageId(pkgId).length;
     }
-    return subscribers.filter(s => isActiveSubscriber(s)).length;
+    return subscribers.filter((s) => isActiveSubscriber(s)).length;
   };
 
   const estimatedRecipientsCount = getEstimatedRecipients();
-  const activeSubscribersCount = subscribers.filter(s => isActiveSubscriber(s)).length;
+  const activeSubscribersCount = subscribers.filter((s) => isActiveSubscriber(s)).length;
   const allPersonsCount = getAllPersons().length;
 
   // SMS length calculation
@@ -181,20 +180,40 @@ export const SmsCampaignPage: React.FC = () => {
     setIsSending(true);
     try {
       const payload: any = {
-        name: campaignName,
-        message,
-        recipientType: recipientType
-      };
+  name: campaignName,
+  campaignName,                        // ✅ send both so route works
+  message,
+  recipientType,
+};
 
-      if (recipientType === 'persons') {
-        payload.packageId = selectedPackageId || undefined;
-        payload.targetFilter = selectedPackageId ? 'Package-specific' : 'All Persons';
-      } else {
-        payload.targetFilter = targetFilter;
-      }
+if (recipientType === 'persons') {
+  payload.packageId = selectedPackageId || undefined;
+  payload.targetFilter = selectedPackageId ? 'Package-specific' : 'All Persons';
+} else {
+  if (targetFilter.startsWith('Package:')) {
+    const pkgId = targetFilter.slice('Package:'.length);
+    const pkgTitle = packages.find((p) => p.id === pkgId)?.titleEn || 'Package';
+    payload.targetFilter = `Package: ${pkgTitle}`;   // human-readable label for history
+    payload.packageInterestId = pkgId;               // ✅ precise filter for backend
+  } else {
+    payload.targetFilter = targetFilter;
+  }
+
+  // ✅ Send manual numbers when that filter is active
+  if (targetFilter === 'Manual Numbers') {
+    payload.manualNumbers = manualNumbers;
+  }
+}
+
+if (scheduledDate) {
+  payload.scheduledDate = scheduledDate;
+}
 
       const newCmp = await sendSmsCampaignApi(payload);
-      showToast('success', `Campaign "${newCmp.name}" sent to ${newCmp.recipientsCount} recipients!`);
+      showToast(
+        'success',
+        `Campaign "${newCmp.name}" sent to ${newCmp.recipientsCount} recipients!`
+      );
       setIsSendConfirmOpen(false);
       setMessage('');
       loadData();
@@ -209,7 +228,9 @@ export const SmsCampaignPage: React.FC = () => {
   const handleExportCampaignReport = (cmp: SmsCampaign) => {
     const headers = ['Recipient Phone', 'Name', 'Status'];
     const rows = (cmp.recipients || []).map((r) => [r.phone, r.name || 'Subscriber', r.status]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const link = document.createElement('a');
     link.href = encodeURI(csvContent);
     link.download = `sms_report_${cmp.name.replace(/\s+/g, '_')}.csv`;
@@ -226,7 +247,9 @@ export const SmsCampaignPage: React.FC = () => {
       {/* Header */}
       <div>
         <h2 className="text-xl font-extrabold text-slate-900">SMS Campaign & Broadcast Center</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Compose marketing SMS messages, preview mobile layout, send test messages, and dispatch campaigns.</p>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Compose marketing SMS messages, preview mobile layout, send test messages, and dispatch campaigns.
+        </p>
       </div>
 
       {/* Stats Cards */}
@@ -258,7 +281,9 @@ export const SmsCampaignPage: React.FC = () => {
           </h3>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Campaign Reference Name *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Campaign Reference Name *
+            </label>
             <input
               type="text"
               required
@@ -269,7 +294,7 @@ export const SmsCampaignPage: React.FC = () => {
             />
           </div>
 
-          {/* Recipient Type Selector - NEW */}
+          {/* Recipient Type Selector */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Recipient Type *</label>
             <div className="flex gap-3">
@@ -299,7 +324,6 @@ export const SmsCampaignPage: React.FC = () => {
           </div>
 
           {recipientType === 'persons' ? (
-            // Persons on Package Selection
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Select Package</label>
               <select
@@ -309,7 +333,8 @@ export const SmsCampaignPage: React.FC = () => {
               >
                 <option value="">All Packages ({allPersonsCount} persons)</option>
                 {packages.map((pkg) => {
-                  const count = pkg.persons?.filter(p => p.phone).length || 0;
+                  const count =
+                    ((pkg as any).persons?.filter((p: any) => p.phone)?.length) || 0;
                   return (
                     <option key={pkg.id} value={pkg.id}>
                       {pkg.titleEn} ({count} person{count !== 1 ? 's' : ''})
@@ -319,28 +344,33 @@ export const SmsCampaignPage: React.FC = () => {
               </select>
               {selectedPackageId && (
                 <p className="text-[10px] text-slate-500 mt-1">
-                  Sending to persons in: {packages.find(p => p.id === selectedPackageId)?.titleEn}
+                  Sending to persons in:{' '}
+                  {packages.find((p) => p.id === selectedPackageId)?.titleEn}
                 </p>
               )}
             </div>
           ) : (
-            // Subscribers Selection (existing)
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Recipient Selection Filter *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Recipient Selection Filter *
+                </label>
                 <select
                   value={targetFilter}
                   onChange={(e) => setTargetFilter(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-[#1A5B4B]"
                 >
-                  <option value="Active Opt-in">Active Opt-in Subscribers ({activeSubscribersCount})</option>
+                  <option value="Active Opt-in">
+                    Active Opt-in Subscribers ({activeSubscribersCount})
+                  </option>
                   <option value="All Subscribers">All Subscribers ({subscribers.length})</option>
-                  
+
+                  {/* ✅ Package options now use IDs in the value */}
                   <optgroup label="📦 Package Specific Subscribers">
                     {packages.map((pkg) => {
-                      const count = getSubscribersForPackage(pkg.titleEn).length;
+                      const count = getSubscribersForPackageId(pkg.id).length;
                       return (
-                        <option key={pkg.id} value={`Package: ${pkg.titleEn}`}>
+                        <option key={pkg.id} value={`Package:${pkg.id}`}>
                           {pkg.titleEn} ({count} subscriber{count !== 1 ? 's' : ''})
                         </option>
                       );
@@ -348,7 +378,10 @@ export const SmsCampaignPage: React.FC = () => {
                   </optgroup>
 
                   <optgroup label="⚙️ Other Recipient Filters">
-                    <option value="Package-specific">All Package Leads ({subscribers.filter(s => s.packageInterest).length})</option>
+                    <option value="Package-specific">
+                      All Package Leads (
+                      {subscribers.filter((s) => s.packageInterestId).length})
+                    </option>
                     <option value="Manual Numbers">Manual Numbers Input</option>
                   </optgroup>
                 </select>
@@ -356,7 +389,9 @@ export const SmsCampaignPage: React.FC = () => {
 
               {targetFilter === 'Manual Numbers' && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Manual Phone Numbers (comma or newline separated)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Manual Phone Numbers (comma or newline separated)
+                  </label>
                   <textarea
                     rows={3}
                     value={manualNumbers}
@@ -370,7 +405,9 @@ export const SmsCampaignPage: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Schedule Dispatch (Optional)</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Schedule Dispatch (Optional)
+            </label>
             <input
               type="datetime-local"
               value={scheduledDate}
@@ -381,9 +418,16 @@ export const SmsCampaignPage: React.FC = () => {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-slate-700">SMS Message Content *</label>
-              <span className={`text-[11px] font-mono font-bold ${charLength > 1500 ? 'text-rose-600' : 'text-slate-500'}`}>
-                {charLength} / 1600 chars ({smsSegments} {smsSegments === 1 ? 'segment' : 'segments'})
+              <label className="block text-xs font-bold text-slate-700">
+                SMS Message Content *
+              </label>
+              <span
+                className={`text-[11px] font-mono font-bold ${
+                  charLength > 1500 ? 'text-rose-600' : 'text-slate-500'
+                }`}
+              >
+                {charLength} / 1600 chars ({smsSegments}{' '}
+                {smsSegments === 1 ? 'segment' : 'segments'})
               </span>
             </div>
             <textarea
@@ -397,7 +441,8 @@ export const SmsCampaignPage: React.FC = () => {
 
             {isOverTwilioLimit && (
               <p className="mt-1.5 text-xs text-rose-600 font-semibold flex items-center gap-1">
-                <AlertTriangle className="w-4 h-4" /> Message exceeds 1600 character Twilio SMS limit!
+                <AlertTriangle className="w-4 h-4" /> Message exceeds 1600 character Twilio SMS
+                limit!
               </p>
             )}
           </div>
@@ -406,7 +451,10 @@ export const SmsCampaignPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <Users className="w-4 h-4 text-[#1A5B4B]" />
-              <span>Targeting <strong>{estimatedRecipientsCount}</strong> {recipientType === 'persons' ? 'persons' : 'contacts'}</span>
+              <span>
+                Targeting <strong>{estimatedRecipientsCount}</strong>{' '}
+                {recipientType === 'persons' ? 'persons' : 'contacts'}
+              </span>
             </div>
 
             <div className="flex items-center gap-3">
@@ -440,7 +488,6 @@ export const SmsCampaignPage: React.FC = () => {
               <span className="text-[10px] text-slate-400">Delta Travel SMS</span>
             </div>
 
-            {/* Simulated Phone Device Frame */}
             <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-inner space-y-3 my-2">
               <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
                 <div className="w-7 h-7 rounded-full bg-[#1A5B4B] text-xs font-bold flex items-center justify-center text-white">
@@ -453,7 +500,11 @@ export const SmsCampaignPage: React.FC = () => {
               </div>
 
               <div className="p-3 bg-emerald-900/60 border border-emerald-700/50 rounded-xl text-xs text-emerald-100 leading-relaxed font-sans shadow-xs">
-                {message || <span className="text-slate-500 italic">Message preview will appear here as you type...</span>}
+                {message || (
+                  <span className="text-slate-500 italic">
+                    Message preview will appear here as you type...
+                  </span>
+                )}
               </div>
               <p className="text-[9px] text-slate-400 text-right">Just now • Delivered</p>
             </div>
@@ -461,7 +512,9 @@ export const SmsCampaignPage: React.FC = () => {
 
           <div className="pt-4 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
             <span>Segments: {smsSegments}</span>
-            <span>Estimated Cost: ${(estimatedRecipientsCount * 0.02 * smsSegments).toFixed(2)}</span>
+            <span>
+              Estimated Cost: ${(estimatedRecipientsCount * 0.02 * smsSegments).toFixed(2)}
+            </span>
           </div>
         </div>
       </div>
@@ -500,7 +553,9 @@ export const SmsCampaignPage: React.FC = () => {
                   <tr key={cmp.id} className="hover:bg-slate-50">
                     <td className="p-3 font-bold text-slate-900">{cmp.name}</td>
                     <td className="p-3 text-slate-600">{cmp.targetFilter}</td>
-                    <td className="p-3 max-w-xs truncate text-slate-700 font-sans">{cmp.message}</td>
+                    <td className="p-3 max-w-xs truncate text-slate-700 font-sans">
+                      {cmp.message}
+                    </td>
                     <td className="p-3 font-bold text-slate-900">{cmp.recipientsCount}</td>
                     <td className="p-3 text-slate-500">{cmp.sentDate}</td>
                     <td className="p-3">
@@ -534,8 +589,12 @@ export const SmsCampaignPage: React.FC = () => {
       <ConfirmModal
         isOpen={isSendConfirmOpen}
         title="Confirm SMS Campaign Broadcast?"
-        message={`Are you sure you want to broadcast this message to ${estimatedRecipientsCount} ${recipientType === 'persons' ? 'persons' : 'subscribers'}?`}
-        confirmLabel={`Send to ${estimatedRecipientsCount} ${recipientType === 'persons' ? 'Persons' : 'Contacts'}`}
+        message={`Are you sure you want to broadcast this message to ${estimatedRecipientsCount} ${
+          recipientType === 'persons' ? 'persons' : 'subscribers'
+        }?`}
+        confirmLabel={`Send to ${estimatedRecipientsCount} ${
+          recipientType === 'persons' ? 'Persons' : 'Contacts'
+        }`}
         onConfirm={handleDispatchCampaign}
         onCancel={() => setIsSendConfirmOpen(false)}
         isLoading={isSending}

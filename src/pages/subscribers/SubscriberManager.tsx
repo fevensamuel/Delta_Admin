@@ -42,6 +42,7 @@ interface SubscriberModalProps {
   onSubmit: (data: Omit<Subscriber, 'id' | 'dateSubscribed'>) => Promise<void>;
   initialData?: Subscriber | null;
   mode: 'add' | 'edit';
+  packages: Package[];
 }
 
 const SubscriberModal: React.FC<SubscriberModalProps> = ({
@@ -49,18 +50,18 @@ const SubscriberModal: React.FC<SubscriberModalProps> = ({
   onClose,
   onSubmit,
   initialData,
-  mode
+  mode,
+  packages
 }) => {
   const { showToast } = useToast();
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [channel, setChannel] = useState('Social Media');
-  const [packageInterest, setPackageInterest] = useState('');
+  const [packageInterestId, setPackageInterestId] = useState<string>('');
   const [optInStatus, setOptInStatus] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset form when modal opens / initialData changes
   useEffect(() => {
     if (!isOpen) return;
     if (mode === 'edit' && initialData) {
@@ -68,16 +69,16 @@ const SubscriberModal: React.FC<SubscriberModalProps> = ({
       setEmail(initialData.email || '');
       setName(initialData.name || '');
       setChannel(initialData.channel || 'Social Media');
-      setPackageInterest(initialData.packageInterest || '');
+      setPackageInterestId(initialData.packageInterestId || '');
       setOptInStatus(
-        initialData.optInStatus === 'Active' || initialData.optInStatus === true
+        initialData.optInStatus === 'Active' || (initialData.optInStatus as any) === true
       );
     } else {
       setPhone('');
       setEmail('');
       setName('');
       setChannel('Social Media');
-      setPackageInterest('');
+      setPackageInterestId('');
       setOptInStatus(true);
     }
   }, [isOpen, mode, initialData]);
@@ -97,7 +98,7 @@ const SubscriberModal: React.FC<SubscriberModalProps> = ({
         email: email.trim() || '',
         name: name.trim() || '',
         channel,
-        packageInterest: packageInterest || '',
+        packageInterestId: packageInterestId || null,
         optInStatus: optInStatus ? 'Active' : 'Opt-out'
       } as any);
       onClose();
@@ -167,14 +168,21 @@ const SubscriberModal: React.FC<SubscriberModalProps> = ({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-[#111827] mb-1">Package Interest (Optional)</label>
-            <input
-              type="text"
-              value={packageInterest}
-              onChange={(e) => setPackageInterest(e.target.value)}
-              placeholder="e.g. Premium Umrah Package"
-              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E] focus:border-[#C8102E]"
-            />
+            <label className="block text-xs font-bold text-[#111827] mb-1">
+              Package Interest (Optional)
+            </label>
+            <select
+              value={packageInterestId}
+              onChange={(e) => setPackageInterestId(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E]"
+            >
+              <option value="">None</option>
+              {packages.map((pkg) => (
+                <option key={pkg.id} value={pkg.id}>
+                  {pkg.titleEn}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -232,7 +240,6 @@ export const SubscriberManager: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [packageFilter, setPackageFilter] = useState('All');
 
-  // ✅ Sort order (default: newest first)
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
 
   // Multi-select
@@ -332,6 +339,12 @@ export const SubscriberManager: React.FC = () => {
     }
   };
 
+  // ✅ Lookup helper — get package title from ID
+  const getPackageTitle = (pkgId?: string | null): string => {
+    if (!pkgId) return '';
+    return packages.find((p) => p.id === pkgId)?.titleEn || '';
+  };
+
   const handleExportCsv = () => {
     const subscribersArray = ensureArray<Subscriber>(subscribers);
     if (subscribersArray.length === 0) {
@@ -346,7 +359,7 @@ export const SubscriberManager: React.FC = () => {
       s.email || '',
       s.name || '',
       s.channel || '',
-      `"${s.packageInterest || ''}"`,
+      `"${getPackageTitle(s.packageInterestId) || ''}"`,
       isActiveSubscriber(s) ? 'Active' : 'Opt-out',
       s.dateSubscribed || new Date().toISOString().split('T')[0]
     ]);
@@ -372,12 +385,12 @@ export const SubscriberManager: React.FC = () => {
     const subscribersArray = ensureArray<Subscriber>(subscribers);
 
     const filtered = subscribersArray.filter((sub) => {
+      const pkgTitle = getPackageTitle(sub.packageInterestId);
       const matchesSearch =
         sub.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (sub.email && sub.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (sub.name && sub.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (sub.packageInterest &&
-          sub.packageInterest.toLowerCase().includes(searchTerm.toLowerCase()));
+        (pkgTitle && pkgTitle.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesChannel = channelFilter === 'All' || sub.channel === channelFilter;
 
@@ -388,16 +401,13 @@ export const SubscriberManager: React.FC = () => {
         matchesStatus = !isActiveSubscriber(sub);
       }
 
+      // ✅ Filter by package ID (exact match)
       const matchesPackage =
-        packageFilter === 'All' ||
-        (sub.packageInterest &&
-          (sub.packageInterest.toLowerCase().includes(packageFilter.toLowerCase()) ||
-            packageFilter.toLowerCase().includes(sub.packageInterest.toLowerCase())));
+        packageFilter === 'All' || sub.packageInterestId === packageFilter;
 
       return matchesSearch && matchesChannel && matchesStatus && matchesPackage;
     });
 
-    // ✅ Sort by date (ascending or descending)
     const sorted = [...filtered].sort((a, b) => {
       const dateA = new Date(a.createdAt || a.dateSubscribed || 0).getTime();
       const dateB = new Date(b.createdAt || b.dateSubscribed || 0).getTime();
@@ -508,7 +518,6 @@ export const SubscriberManager: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             <Filter className="w-4 h-4 text-slate-500" />
 
-            {/* ✅ Sort dropdown */}
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-xl border border-slate-300 bg-white">
               <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
               <select
@@ -522,6 +531,7 @@ export const SubscriberManager: React.FC = () => {
               </select>
             </div>
 
+            {/* ✅ Package filter — now matches by ID */}
             <select
               value={packageFilter}
               onChange={(e) => setPackageFilter(e.target.value)}
@@ -529,7 +539,7 @@ export const SubscriberManager: React.FC = () => {
             >
               <option value="All">All Packages</option>
               {packages.map((pkg) => (
-                <option key={pkg.id} value={pkg.titleEn}>
+                <option key={pkg.id} value={pkg.id}>
                   📦 {pkg.titleEn}
                 </option>
               ))}
@@ -611,98 +621,100 @@ export const SubscriberManager: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                paginatedSubscribers.map((sub) => (
-                  <tr key={sub.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="p-3.5 pl-5">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(sub.id)}
-                        onChange={() => handleToggleSelectOne(sub.id)}
-                        className="w-4 h-4 rounded text-[#1A5B4B]"
-                      />
-                    </td>
+                paginatedSubscribers.map((sub) => {
+                  const pkgTitle = getPackageTitle(sub.packageInterestId);
+                  return (
+                    <tr key={sub.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="p-3.5 pl-5">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(sub.id)}
+                          onChange={() => handleToggleSelectOne(sub.id)}
+                          className="w-4 h-4 rounded text-[#1A5B4B]"
+                        />
+                      </td>
 
-                    <td className="p-3.5 font-bold font-mono text-slate-900 text-sm">
-                      {sub.phone || 'N/A'}
-                    </td>
+                      <td className="p-3.5 font-bold font-mono text-slate-900 text-sm">
+                        {sub.phone || 'N/A'}
+                      </td>
 
-                    <td className="p-3.5 text-slate-700">{sub.name || '—'}</td>
+                      <td className="p-3.5 text-slate-700">{sub.name || '—'}</td>
 
-                    <td className="p-3.5 text-slate-600">{sub.email || '—'}</td>
+                      <td className="p-3.5 text-slate-600">{sub.email || '—'}</td>
 
-                    <td className="p-3.5">
-                      <span className="px-2 py-0.5 rounded bg-slate-100 font-semibold text-slate-700 text-[11px]">
-                        {sub.channel || 'Unknown'}
-                      </span>
-                    </td>
+                      <td className="p-3.5">
+                        <span className="px-2 py-0.5 rounded bg-slate-100 font-semibold text-slate-700 text-[11px]">
+                          {sub.channel || 'Unknown'}
+                        </span>
+                      </td>
 
-                    <td className="p-3.5 max-w-xs truncate text-slate-700">
-                      {sub.packageInterest || 'General Offers'}
-                    </td>
+                      {/* ✅ Show package title resolved from ID */}
+                      <td className="p-3.5 max-w-xs truncate text-slate-700">
+                        {pkgTitle || '—'}
+                      </td>
 
-                    <td className="p-3.5">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          isActiveSubscriber(sub)
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-rose-100 text-rose-800'
-                        }`}
-                      >
-                        {isActiveSubscriber(sub) ? 'Active' : 'Opt-out'}
-                      </span>
-                    </td>
-
-                    <td className="p-3.5 text-slate-500">
-                      {sub.dateSubscribed || new Date().toISOString().split('T')[0]}
-                    </td>
-
-                    <td className="p-3.5 pr-5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {/* ✅ Edit button */}
-                        <button
-                          onClick={() => {
-                            setEditingSubscriber(sub);
-                            setIsEditModalOpen(true);
-                          }}
-                          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
-                          title="Edit subscriber"
+                      <td className="p-3.5">
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            isActiveSubscriber(sub)
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-rose-100 text-rose-800'
+                          }`}
                         >
-                          <Edit className="w-3.5 h-3.5 text-[#1A5B4B]" />
-                        </button>
+                          {isActiveSubscriber(sub) ? 'Active' : 'Opt-out'}
+                        </span>
+                      </td>
 
-                        {sub.packageInterest && (
+                      <td className="p-3.5 text-slate-500">
+                        {sub.dateSubscribed || new Date().toISOString().split('T')[0]}
+                      </td>
+
+                      <td className="p-3.5 pr-5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() =>
-                              navigate('/sms', {
-                                state: { targetFilter: `Package: ${sub.packageInterest}` }
-                              })
-                            }
-                            className="p-1.5 rounded-lg border border-slate-200 hover:bg-[#1A5B4B]/10 text-[#1A5B4B] transition-colors"
-                            title="Compose SMS for this package"
+                            onClick={() => {
+                              setEditingSubscriber(sub);
+                              setIsEditModalOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
+                            title="Edit subscriber"
                           >
-                            <Send className="w-3.5 h-3.5" />
+                            <Edit className="w-3.5 h-3.5 text-[#1A5B4B]" />
                           </button>
-                        )}
 
-                        <button
-                          onClick={() => handleToggleOptStatus(sub)}
-                          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
-                          title={isActiveSubscriber(sub) ? 'Mark as Opt-out' : 'Mark as Active'}
-                        >
-                          <X className="w-3.5 h-3.5 text-amber-600" />
-                        </button>
+                          {/* ✅ Send-to-SMS now passes packageId */}
+                          {sub.packageInterestId && (
+                            <button
+                              onClick={() =>
+                                navigate(`/sms?packageId=${encodeURIComponent(sub.packageInterestId!)}`)
+                              }
+                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-[#1A5B4B]/10 text-[#1A5B4B] transition-colors"
+                              title="Compose SMS for this package"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                            </button>
+                          )}
 
-                        <button
-                          onClick={() => setSubToDelete(sub)}
-                          className="p-1.5 rounded-lg border border-slate-200 hover:bg-rose-50 text-rose-600 transition-colors"
-                          title="Delete Subscriber"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <button
+                            onClick={() => handleToggleOptStatus(sub)}
+                            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors"
+                            title={isActiveSubscriber(sub) ? 'Mark as Opt-out' : 'Mark as Active'}
+                          >
+                            <X className="w-3.5 h-3.5 text-amber-600" />
+                          </button>
+
+                          <button
+                            onClick={() => setSubToDelete(sub)}
+                            className="p-1.5 rounded-lg border border-slate-200 hover:bg-rose-50 text-rose-600 transition-colors"
+                            title="Delete Subscriber"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -754,6 +766,7 @@ export const SubscriberManager: React.FC = () => {
         onClose={() => setIsAddModalOpen(false)}
         onSubmit={handleAddSubscriber}
         mode="add"
+        packages={packages}
       />
 
       <SubscriberModal
@@ -765,6 +778,7 @@ export const SubscriberManager: React.FC = () => {
         onSubmit={handleEditSubscriber}
         initialData={editingSubscriber}
         mode="edit"
+        packages={packages}
       />
 
       <ConfirmModal

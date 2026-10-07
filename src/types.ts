@@ -139,13 +139,12 @@ export interface GalleryItem {
 }
 
 export interface Subscriber {
-  id: string;
+    id: string;
   phone: string;
   email?: string;
   name?: string;
   channel: string;
-  packageInterestId?: string;
-  packageInterest?: string;
+  packageInterestId?: string | null; 
   optInStatus: 'Active' | 'Opt-out';
   dateSubscribed: string;
   createdAt?: string;
