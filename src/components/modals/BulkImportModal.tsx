@@ -242,8 +242,6 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900">
             <p className="font-bold mb-1">💡 How it works</p>
             <ul className="list-disc list-inside space-y-0.5 text-[11px]">
-              <li>Every subscriber imported here gets the channel <strong>Bulk Import</strong></li>
-              <li>Phone numbers are automatically normalized (e.g. <span className="font-mono">0974...</span> → <span className="font-mono">+251974...</span>)</li>
               <li>Duplicate phones within the file are skipped</li>
               <li>Duplicate phones against the database are <strong>updated</strong> (not duplicated)</li>
             </ul>

@@ -34,6 +34,11 @@ import {
 } from 'lucide-react';
 
 // ============================================================
+// CONSTANTS
+// ============================================================
+const STANDARD_CHANNELS = ['Social Media', 'WhatsApp', 'Web Banner', 'Direct', 'Others'];
+
+// ============================================================
 // ADD / EDIT SUBSCRIBER MODAL
 // ============================================================
 interface SubscriberModalProps {
@@ -71,7 +76,7 @@ const SubscriberModal: React.FC<SubscriberModalProps> = ({
       setChannel(initialData.channel || 'Social Media');
       setPackageInterestId(initialData.packageInterestId || '');
       setOptInStatus(
-        initialData.optInStatus === 'Active' || (initialData.optInStatus as any) === true
+        initialData.optInStatus === true || (initialData.optInStatus as any) === 'Active'
       );
     } else {
       setPhone('');
@@ -99,7 +104,7 @@ const SubscriberModal: React.FC<SubscriberModalProps> = ({
         name: name.trim() || '',
         channel,
         packageInterestId: packageInterestId || null,
-        optInStatus: optInStatus ? 'Active' : 'Opt-out'
+        optInStatus
       } as any);
       onClose();
     } catch (error: any) {
@@ -108,6 +113,8 @@ const SubscriberModal: React.FC<SubscriberModalProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  const isCustomChannel = channel && !STANDARD_CHANNELS.includes(channel);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -159,12 +166,15 @@ const SubscriberModal: React.FC<SubscriberModalProps> = ({
               onChange={(e) => setChannel(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm focus:ring-2 focus:ring-[#C8102E]"
             >
+              {/* Preserve system-set channels like "Bulk Import" or "Web Form" */}
+              {isCustomChannel && (
+                <option value={channel}>{channel} (system)</option>
+              )}
               <option value="Social Media">Social Media</option>
               <option value="WhatsApp">WhatsApp</option>
               <option value="Web Banner">Web Banner</option>
               <option value="Direct">Direct</option>
               <option value="Others">Others</option>
-              {/* ✅ 'Bulk Import' intentionally removed — only set by the import process */}
             </select>
           </div>
           <div>
@@ -294,12 +304,12 @@ export const SubscriberManager: React.FC = () => {
   };
 
   const isActiveSubscriber = (sub: Subscriber) => {
-    return sub.optInStatus === 'Active' || (sub.optInStatus as any) === true;
+    return sub.optInStatus === true || (sub.optInStatus as any) === 'Active';
   };
 
   const handleToggleOptStatus = async (sub: Subscriber) => {
     try {
-      const newStatus = isActiveSubscriber(sub) ? false : true;
+      const newStatus = !isActiveSubscriber(sub);
       await updateSubscriberStatusApi(sub.id, newStatus);
       showToast('success', `Status updated for ${sub.phone}`);
       loadSubscribers();
@@ -339,7 +349,6 @@ export const SubscriberManager: React.FC = () => {
     }
   };
 
-  // ✅ Lookup helper — get package title from ID
   const getPackageTitle = (pkgId?: string | null): string => {
     if (!pkgId) return '';
     return packages.find((p) => p.id === pkgId)?.titleEn || '';
@@ -359,7 +368,7 @@ export const SubscriberManager: React.FC = () => {
       s.email || '',
       s.name || '',
       s.channel || '',
-      `"${getPackageTitle(s.packageInterestId) || ''}"`,
+      `"${getPackageTitle(s.packageInterestId)}"`,
       isActiveSubscriber(s) ? 'Active' : 'Opt-out',
       s.dateSubscribed || new Date().toISOString().split('T')[0]
     ]);
@@ -401,7 +410,6 @@ export const SubscriberManager: React.FC = () => {
         matchesStatus = !isActiveSubscriber(sub);
       }
 
-      // ✅ Filter by package ID (exact match)
       const matchesPackage =
         packageFilter === 'All' || sub.packageInterestId === packageFilter;
 
@@ -531,7 +539,6 @@ export const SubscriberManager: React.FC = () => {
               </select>
             </div>
 
-            {/* ✅ Package filter — now matches by ID */}
             <select
               value={packageFilter}
               onChange={(e) => setPackageFilter(e.target.value)}
@@ -648,7 +655,6 @@ export const SubscriberManager: React.FC = () => {
                         </span>
                       </td>
 
-                      {/* ✅ Show package title resolved from ID */}
                       <td className="p-3.5 max-w-xs truncate text-slate-700">
                         {pkgTitle || '—'}
                       </td>
@@ -682,7 +688,6 @@ export const SubscriberManager: React.FC = () => {
                             <Edit className="w-3.5 h-3.5 text-[#1A5B4B]" />
                           </button>
 
-                          {/* ✅ Send-to-SMS now passes packageId */}
                           {sub.packageInterestId && (
                             <button
                               onClick={() =>

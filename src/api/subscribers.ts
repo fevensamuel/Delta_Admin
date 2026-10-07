@@ -35,9 +35,6 @@ export async function updateSubscriberStatusApi(
   }
 }
 
-/**
- * ✅ NEW: Update any subscriber fields (name, email, phone, channel, packageInterest, optInStatus)
- */
 export async function updateSubscriberApi(
   id: string,
   data: Partial<Subscriber>
@@ -51,7 +48,6 @@ export async function updateSubscriberApi(
   }
 }
 
-// DELETE single subscriber
 export async function deleteSubscriberApi(id: string): Promise<void> {
   try {
     await apiClient.delete(`/admin/subscribers/${id}`);
@@ -60,7 +56,6 @@ export async function deleteSubscriberApi(id: string): Promise<void> {
   }
 }
 
-// BULK DELETE subscribers
 export async function bulkDeleteSubscribersApi(ids: string[]): Promise<void> {
   try {
     await apiClient.delete('/admin/subscribers/bulk-delete', { data: { ids } });
