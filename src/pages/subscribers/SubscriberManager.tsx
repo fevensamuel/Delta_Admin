@@ -355,40 +355,76 @@ export const SubscriberManager: React.FC = () => {
   };
 
   const handleExportCsv = () => {
-    const subscribersArray = ensureArray<Subscriber>(subscribers);
-    if (subscribersArray.length === 0) {
-      showToast('info', 'No subscribers to export');
-      return;
-    }
+  const subscribersArray = ensureArray<Subscriber>(subscribers);
+  if (subscribersArray.length === 0) {
+    showToast('info', 'No subscribers to export');
+    return;
+  }
 
-    const filteredSubs = getFilteredSubscribers();
-    const headers = ['Phone', 'Email', 'Name', 'Channel', 'Package Interest', 'Status', 'Date Subscribed'];
-    const rows = filteredSubs.map((s) => [
-      s.phone,
-      s.email || '',
-      s.name || '',
-      s.channel || '',
-      `"${getPackageTitle(s.packageInterestId)}"`,
-      isActiveSubscriber(s) ? 'Active' : 'Opt-out',
-      s.dateSubscribed || new Date().toISOString().split('T')[0]
-    ]);
+  const filteredSubs = getFilteredSubscribers();
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute(
-      'download',
-      `delta_subscribers_${new Date().toISOString().substring(0, 10)}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // ---- Header row ----
+  const headers = [
+    'Phone',
+    'Email',
+    'Name',
+    'Channel',
+    'Package Interest',
+    'Status',
+    'Date Subscribed',
+  ];
 
-    showToast('success', 'Exported subscribers CSV report');
+  // ---- CSV escaping helper ----
+  const escapeCsv = (value: string | number | null | undefined): string => {
+    const s = value === null || value === undefined ? '' : String(value);
+    return `"${s.replace(/"/g, '""')}"`;
   };
+
+  // ---- Data rows ----
+  const rows = filteredSubs.map((s) => [
+    // ✅ Phone as Excel-safe text: ="251911223344"
+    //    The leading `=` tells Excel this is a formula evaluating to a string,
+    //    so no scientific notation (2.52E+11) and no corruption on re-save.
+    `"=""${(s.phone || '').replace(/"/g, '""')}"""`,
+
+    escapeCsv(s.email || ''),
+    escapeCsv(s.name || ''),
+    escapeCsv(s.channel || ''),
+    escapeCsv(getPackageTitle(s.packageInterestId) || ''),
+    isActiveSubscriber(s) ? 'Active' : 'Opt-out',
+    escapeCsv(
+      (s as any).dateSubscribed ||
+        (s as any).createdAt?.split('T')[0] ||
+        new Date().toISOString().split('T')[0]
+    ),
+  ]);
+
+  // ---- Build CSV content ----
+  const headerLine = headers.map(escapeCsv).join(',');
+  const dataLines = rows.map((r) => r.join(','));
+  const csvBody = [headerLine, ...dataLines].join('\r\n');  // CRLF = best Excel compat
+
+  // ✅ UTF-8 BOM so Excel opens the file with correct encoding
+  //    (otherwise Amharic / Arabic names show as garbage)
+  const BOM = '\uFEFF';
+  const csvContent = BOM + csvBody;
+
+  // ---- Trigger download via Blob (more reliable than data URI) ----
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute(
+    'download',
+    `delta_subscribers_${new Date().toISOString().substring(0, 10)}.csv`
+  );
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  showToast('success', 'Exported subscribers CSV report');
+};
 
   const getFilteredSubscribers = () => {
     const subscribersArray = ensureArray<Subscriber>(subscribers);
