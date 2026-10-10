@@ -354,7 +354,7 @@ export const SubscriberManager: React.FC = () => {
     return packages.find((p) => p.id === pkgId)?.titleEn || '';
   };
 
-  const handleExportCsv = () => {
+ const handleExportCsv = () => {
   const subscribersArray = ensureArray<Subscriber>(subscribers);
   if (subscribersArray.length === 0) {
     showToast('info', 'No subscribers to export');
@@ -381,35 +381,37 @@ export const SubscriberManager: React.FC = () => {
   };
 
   // ---- Data rows ----
-  const rows = filteredSubs.map((s) => [
-    // ✅ Phone as Excel-safe text: ="251911223344"
-    //    The leading `=` tells Excel this is a formula evaluating to a string,
-    //    so no scientific notation (2.52E+11) and no corruption on re-save.
-    `"=""${(s.phone || '').replace(/"/g, '""')}"""`,
+  const rows = filteredSubs.map((s) => {
+    const rawPhone = (s.phone || '').replace(/"/g, '""');
+    // ✅ Tab-prefix trick: prepend a tab BEFORE the quote so both Excel
+    //    and Google Sheets treat the phone as text and hide the tab.
+    const phoneCell = `"\t${rawPhone}"`;
 
-    escapeCsv(s.email || ''),
-    escapeCsv(s.name || ''),
-    escapeCsv(s.channel || ''),
-    escapeCsv(getPackageTitle(s.packageInterestId) || ''),
-    isActiveSubscriber(s) ? 'Active' : 'Opt-out',
-    escapeCsv(
-      (s as any).dateSubscribed ||
-        (s as any).createdAt?.split('T')[0] ||
-        new Date().toISOString().split('T')[0]
-    ),
-  ]);
+    return [
+      phoneCell,
+      escapeCsv(s.email || ''),
+      escapeCsv(s.name || ''),
+      escapeCsv(s.channel || ''),
+      escapeCsv(getPackageTitle(s.packageInterestId) || ''),
+      isActiveSubscriber(s) ? 'Active' : 'Opt-out',
+      escapeCsv(
+        (s as any).dateSubscribed ||
+          (s as any).createdAt?.split('T')[0] ||
+          new Date().toISOString().split('T')[0]
+      ),
+    ];
+  });
 
   // ---- Build CSV content ----
   const headerLine = headers.map(escapeCsv).join(',');
   const dataLines = rows.map((r) => r.join(','));
-  const csvBody = [headerLine, ...dataLines].join('\r\n');  // CRLF = best Excel compat
+  const csvBody = [headerLine, ...dataLines].join('\r\n');
 
-  // ✅ UTF-8 BOM so Excel opens the file with correct encoding
-  //    (otherwise Amharic / Arabic names show as garbage)
+  // ✅ UTF-8 BOM so Excel opens Amharic / Arabic names correctly
   const BOM = '\uFEFF';
   const csvContent = BOM + csvBody;
 
-  // ---- Trigger download via Blob (more reliable than data URI) ----
+  // ---- Trigger download ----
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
