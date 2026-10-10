@@ -371,7 +371,7 @@ export const SubscriberManager: React.FC = () => {
     'Channel',
     'Package Interest',
     'Status',
-    'Date Subscribed',
+    'Date',
   ];
 
   // ---- CSV escaping helper ----
