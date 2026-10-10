@@ -381,26 +381,20 @@ export const SubscriberManager: React.FC = () => {
   };
 
   // ---- Data rows ----
-  const rows = filteredSubs.map((s) => {
-    const rawPhone = (s.phone || '').replace(/"/g, '""');
-    // ✅ Tab-prefix trick: prepend a tab BEFORE the quote so both Excel
-    //    and Google Sheets treat the phone as text and hide the tab.
-    const phoneCell = `"\t${rawPhone}"`;
-
-    return [
-      phoneCell,
-      escapeCsv(s.email || ''),
-      escapeCsv(s.name || ''),
-      escapeCsv(s.channel || ''),
-      escapeCsv(getPackageTitle(s.packageInterestId) || ''),
-      isActiveSubscriber(s) ? 'Active' : 'Opt-out',
-      escapeCsv(
-        (s as any).dateSubscribed ||
-          (s as any).createdAt?.split('T')[0] ||
-          new Date().toISOString().split('T')[0]
-      ),
-    ];
-  });
+  const rows = filteredSubs.map((s) => [
+    // ✅ Plain quoted phone — works cleanly in Google Sheets
+    `"${(s.phone || '').replace(/"/g, '""')}"`,
+    escapeCsv(s.email || ''),
+    escapeCsv(s.name || ''),
+    escapeCsv(s.channel || ''),
+    escapeCsv(getPackageTitle(s.packageInterestId) || ''),
+    isActiveSubscriber(s) ? 'Active' : 'Opt-out',
+    escapeCsv(
+      (s as any).dateSubscribed ||
+        (s as any).createdAt?.split('T')[0] ||
+        new Date().toISOString().split('T')[0]
+    ),
+  ]);
 
   // ---- Build CSV content ----
   const headerLine = headers.map(escapeCsv).join(',');
