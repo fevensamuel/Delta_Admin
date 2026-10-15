@@ -1,3 +1,4 @@
+// src/pages/sms/SmsCampaignPage.tsx
 import React, { useEffect, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { SmsCampaign, Subscriber, Package } from '../../types';
@@ -50,14 +51,13 @@ export const SmsCampaignPage: React.FC = () => {
     loadData();
   }, []);
 
-  // ✅ Handle incoming packageId from SubscriberManager (?packageId=xxx)
+  // Handle incoming packageId from SubscriberManager (?packageId=xxx)
   useEffect(() => {
     const pkgId = searchParams.get('packageId');
     if (pkgId && packages.length > 0) {
       const pkg = packages.find((p) => p.id === pkgId);
       if (pkg) {
         setRecipientType('subscribers');
-        // Use ID-based targetFilter
         setTargetFilter(`Package:${pkgId}`);
       }
     }
@@ -90,12 +90,12 @@ export const SmsCampaignPage: React.FC = () => {
     }
   };
 
-  // Helper to check if subscriber is active (handles both string and boolean)
+  // Helper to check if subscriber is active (handles both boolean and string)
   const isActiveSubscriber = (sub: Subscriber) => {
-    return sub.optInStatus === 'Active' || sub.optInStatus === true;
+    return sub.optInStatus === true || (sub.optInStatus as any) === 'Active';
   };
 
-  // ✅ Match subscribers by package ID (exact match)
+  // Match subscribers by package ID (exact match)
   const getSubscribersForPackageId = (pkgId: string) => {
     return subscribers.filter((s) => s.packageInterestId === pkgId);
   };
@@ -150,7 +150,7 @@ export const SmsCampaignPage: React.FC = () => {
       const numbers = manualNumbers.split(/[\n,;]+/).filter((n) => n.trim().length > 0);
       return numbers.length;
     }
-    // ✅ targetFilter format: "Package:<id>"
+    // targetFilter format: "Package:<id>"
     if (targetFilter.startsWith('Package:')) {
       const pkgId = targetFilter.slice('Package:'.length);
       return getSubscribersForPackageId(pkgId).length;
@@ -173,53 +173,62 @@ export const SmsCampaignPage: React.FC = () => {
       return;
     }
     if (isOverTwilioLimit) {
-      showToast('error', 'Message exceeds 1600 character Twilio limit');
+      showToast('error', 'Message exceeds 1600 character limit');
       return;
     }
 
     setIsSending(true);
     try {
       const payload: any = {
-  name: campaignName,
-  campaignName,                        // ✅ send both so route works
-  message,
-  recipientType,
-};
+        name: campaignName,
+        campaignName,          // also send as campaignName for backend compat
+        message,
+        recipientType,
+      };
 
-if (recipientType === 'persons') {
-  payload.packageId = selectedPackageId || undefined;
-  payload.targetFilter = selectedPackageId ? 'Package-specific' : 'All Persons';
-} else {
-  if (targetFilter.startsWith('Package:')) {
-    const pkgId = targetFilter.slice('Package:'.length);
-    const pkgTitle = packages.find((p) => p.id === pkgId)?.titleEn || 'Package';
-    payload.targetFilter = `Package: ${pkgTitle}`;   // human-readable label for history
-    payload.packageInterestId = pkgId;               // ✅ precise filter for backend
-  } else {
-    payload.targetFilter = targetFilter;
-  }
+      if (recipientType === 'persons') {
+        payload.packageId = selectedPackageId || undefined;
+        payload.targetFilter = selectedPackageId ? 'Package-specific' : 'All Persons';
+      } else {
+        payload.targetFilter = targetFilter;
 
-  // ✅ Send manual numbers when that filter is active
-  if (targetFilter === 'Manual Numbers') {
-    payload.manualNumbers = manualNumbers;
-  }
-}
+        // ✅ Manual numbers — CRITICAL: send the actual phone numbers
+        if (targetFilter === 'Manual Numbers') {
+          payload.manualNumbers = manualNumbers;
+        }
 
-if (scheduledDate) {
-  payload.scheduledDate = scheduledDate;
-}
+        // ✅ Package-specific (translate "Package:<id>" to a proper payload)
+        if (targetFilter.startsWith('Package:')) {
+          const pkgId = targetFilter.slice('Package:'.length);
+          const pkgTitle = packages.find((p) => p.id === pkgId)?.titleEn || 'Package';
+          payload.targetFilter = `Package: ${pkgTitle}`;
+          payload.packageInterestId = pkgId;
+        }
+      }
 
-      const newCmp = await sendSmsCampaignApi(payload);
+      if (scheduledDate) {
+        payload.scheduledDate = scheduledDate;
+      }
+
+      console.log('📤 Sending SMS campaign payload:', payload);
+
+      const newCmp: any = await sendSmsCampaignApi(payload);
+
       showToast(
         'success',
-        `Campaign "${newCmp.name}" sent to ${newCmp.recipientsCount} recipients!`
+        `Campaign "${newCmp.campaignName || newCmp.name || campaignName}" sent. ` +
+          `Delivered: ${newCmp.delivered ?? 0}, Failed: ${newCmp.failed ?? 0}`
       );
       setIsSendConfirmOpen(false);
       setMessage('');
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error sending campaign:', error);
-      showToast('error', 'Failed to send campaign');
+      const msg =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        'Failed to send campaign';
+      showToast('error', msg);
     } finally {
       setIsSending(false);
     }
@@ -333,8 +342,7 @@ if (scheduledDate) {
               >
                 <option value="">All Packages ({allPersonsCount} persons)</option>
                 {packages.map((pkg) => {
-                  const count =
-                    ((pkg as any).persons?.filter((p: any) => p.phone)?.length) || 0;
+                  const count = ((pkg as any).persons?.filter((p: any) => p.phone)?.length) || 0;
                   return (
                     <option key={pkg.id} value={pkg.id}>
                       {pkg.titleEn} ({count} person{count !== 1 ? 's' : ''})
@@ -365,7 +373,7 @@ if (scheduledDate) {
                   </option>
                   <option value="All Subscribers">All Subscribers ({subscribers.length})</option>
 
-                  {/* ✅ Package options now use IDs in the value */}
+                  {/* Package options use IDs in the value */}
                   <optgroup label="📦 Package Specific Subscribers">
                     {packages.map((pkg) => {
                       const count = getSubscribersForPackageId(pkg.id).length;
@@ -441,8 +449,7 @@ if (scheduledDate) {
 
             {isOverTwilioLimit && (
               <p className="mt-1.5 text-xs text-rose-600 font-semibold flex items-center gap-1">
-                <AlertTriangle className="w-4 h-4" /> Message exceeds 1600 character Twilio SMS
-                limit!
+                <AlertTriangle className="w-4 h-4" /> Message exceeds 1600 character limit!
               </p>
             )}
           </div>
