@@ -210,7 +210,7 @@ export const SmsCampaignPage: React.FC = () => {
 
   // ✅ Rewritten — fetches recipients from backend
   const handleExportCampaignReport = async (cmp: any) => {
-    const campaignNameToExport = cmp.name || cmp.campaignName;
+    const campaignNameToExport = cmp.campaignName || cmp.name;
     if (!campaignNameToExport) {
       showToast('error', 'Campaign name missing');
       return;
@@ -559,52 +559,53 @@ export const SmsCampaignPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-              {campaigns.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">
-                    No past campaigns sent yet.
-                  </td>
-                </tr>
-              ) : (
-                campaigns.map((cmp: any) => (
-                  <tr key={cmp.name} className="hover:bg-slate-50">
-                    <td className="p-3 font-bold text-slate-900">{cmp.name}</td>
-                    <td className="p-3 max-w-xs truncate text-slate-700 font-sans">
-                      {cmp.message}
-                    </td>
-                    <td className="p-3 font-bold text-slate-900">
-                      {cmp.recipientsCount ?? cmp.recipients_count ?? 0}
-                    </td>
-                    <td className="p-3 text-slate-500">
-                      {cmp.sentDate || cmp.sent_date
-                        ? new Date(cmp.sentDate || cmp.sent_date).toLocaleString()
-                        : '—'}
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
-                          cmp.status === 'Delivered'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : cmp.status === 'Partial'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-rose-100 text-rose-800'
-                        }`}
-                      >
-                        {cmp.status}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <button
-                        onClick={() => handleExportCampaignReport(cmp)}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold inline-flex items-center gap-1"
-                      >
-                        <FileSpreadsheet className="w-3.5 h-3.5 text-[#1A5B4B]" /> Export CSV
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
+  {campaigns.length === 0 ? (
+    <tr>
+      <td colSpan={6} className="p-8 text-center text-slate-500">
+        No past campaigns sent yet.
+      </td>
+    </tr>
+  ) : (
+    campaigns.map((cmp: any, idx: number) => {
+      const name = cmp.campaignName || cmp.name || '—';
+      const sentAt = cmp.sentAt || cmp.sentDate || cmp.sent_date;
+      const status = cmp.status || 'Pending';
+      return (
+        <tr key={cmp.id || `${name}-${idx}`} className="hover:bg-slate-50">
+          <td className="p-3 font-bold text-slate-900">{name}</td>
+          <td className="p-3 max-w-xs truncate text-slate-700 font-sans">
+            {cmp.message || '—'}
+          </td>
+          <td className="p-3 font-bold text-slate-900">1</td>
+          <td className="p-3 text-slate-500">
+            {sentAt ? new Date(sentAt).toLocaleString() : '—'}
+          </td>
+          <td className="p-3">
+            <span
+              className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
+                status === 'Delivered'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : status === 'Failed'
+                    ? 'bg-rose-100 text-rose-800'
+                    : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              {status}
+            </span>
+          </td>
+          <td className="p-3 text-right">
+            <button
+              onClick={() => handleExportCampaignReport(cmp)}
+              className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold inline-flex items-center gap-1"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-[#1A5B4B]" /> Export CSV
+            </button>
+          </td>
+        </tr>
+      );
+    })
+  )}
+</tbody>
           </table>
         </div>
       </div>
