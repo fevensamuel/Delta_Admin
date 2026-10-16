@@ -5,7 +5,6 @@ import { SmsCampaign, Subscriber, Package } from '../../types';
 import { getCampaignsApi, sendSmsCampaignApi } from '../../api/sms';
 import { getSubscribersApi } from '../../api/subscribers';
 import { getPackagesApi } from '../../api/packages';
-import { TestSmsModal } from '../../components/modals/TestSmsModal';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useToast } from '../../context/ToastContext';
@@ -17,16 +16,18 @@ import {
   AlertTriangle,
   History,
   FileSpreadsheet,
-  Package as PackageIcon,
   User
 } from 'lucide-react';
+
+const API_BASE =
+  (import.meta as any).env?.VITE_API_URL || 'https://api.deltagrouptravelumrah.com/api';
 
 export const SmsCampaignPage: React.FC = () => {
   const { showToast } = useToast();
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  const [campaigns, setCampaigns] = useState<SmsCampaign[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [packages, setPackages] = useState<Package[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +44,6 @@ export const SmsCampaignPage: React.FC = () => {
   );
 
   // Modals
-  const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [isSendConfirmOpen, setIsSendConfirmOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
@@ -51,7 +51,6 @@ export const SmsCampaignPage: React.FC = () => {
     loadData();
   }, []);
 
-  // Handle incoming packageId from SubscriberManager (?packageId=xxx)
   useEffect(() => {
     const pkgId = searchParams.get('packageId');
     if (pkgId && packages.length > 0) {
@@ -72,13 +71,9 @@ export const SmsCampaignPage: React.FC = () => {
         getPackagesApi()
       ]);
 
-      const campaignData = Array.isArray(cData) ? cData : [];
-      const subscriberData = Array.isArray(sData) ? sData : [];
-      const packageData = Array.isArray(pData) ? pData : [];
-
-      setCampaigns(campaignData);
-      setSubscribers(subscriberData);
-      setPackages(packageData);
+      setCampaigns(Array.isArray(cData) ? cData : []);
+      setSubscribers(Array.isArray(sData) ? sData : []);
+      setPackages(Array.isArray(pData) ? pData : []);
     } catch (error) {
       console.error('❌ Error loading SMS campaign data:', error);
       showToast('error', 'Failed to load SMS campaign data');
@@ -90,24 +85,20 @@ export const SmsCampaignPage: React.FC = () => {
     }
   };
 
-  // Helper to check if subscriber is active (handles both boolean and string)
   const isActiveSubscriber = (sub: Subscriber) => {
     return sub.optInStatus === true || (sub.optInStatus as any) === 'Active';
   };
 
-  // Match subscribers by package ID (exact match)
   const getSubscribersForPackageId = (pkgId: string) => {
     return subscribers.filter((s) => s.packageInterestId === pkgId);
   };
 
-  // Get persons from a specific package
   const getPersonsForPackage = (pkgId: string) => {
     const pkg = packages.find((p) => p.id === pkgId);
     if (!pkg || !(pkg as any).persons) return [];
     return (pkg as any).persons.filter((p: any) => p.phone);
   };
 
-  // Get all persons from all packages
   const getAllPersons = () => {
     const allPersons: any[] = [];
     packages.forEach((pkg) => {
@@ -127,30 +118,18 @@ export const SmsCampaignPage: React.FC = () => {
     return allPersons;
   };
 
-  // Recipient Calculation
   const getEstimatedRecipients = () => {
     if (recipientType === 'persons') {
-      if (selectedPackageId) {
-        return getPersonsForPackage(selectedPackageId).length;
-      }
+      if (selectedPackageId) return getPersonsForPackage(selectedPackageId).length;
       return getAllPersons().length;
     }
 
-    // Subscribers
-    if (targetFilter === 'All Subscribers') {
-      return subscribers.length;
-    }
-    if (targetFilter === 'Active Opt-in') {
-      return subscribers.filter((s) => isActiveSubscriber(s)).length;
-    }
-    if (targetFilter === 'Package-specific') {
-      return subscribers.filter((s) => s.packageInterestId).length;
-    }
+    if (targetFilter === 'All Subscribers') return subscribers.length;
+    if (targetFilter === 'Active Opt-in') return subscribers.filter((s) => isActiveSubscriber(s)).length;
+    if (targetFilter === 'Package-specific') return subscribers.filter((s) => s.packageInterestId).length;
     if (targetFilter === 'Manual Numbers') {
-      const numbers = manualNumbers.split(/[\n,;]+/).filter((n) => n.trim().length > 0);
-      return numbers.length;
+      return manualNumbers.split(/[\n,;]+/).filter((n) => n.trim().length > 0).length;
     }
-    // targetFilter format: "Package:<id>"
     if (targetFilter.startsWith('Package:')) {
       const pkgId = targetFilter.slice('Package:'.length);
       return getSubscribersForPackageId(pkgId).length;
@@ -162,7 +141,6 @@ export const SmsCampaignPage: React.FC = () => {
   const activeSubscribersCount = subscribers.filter((s) => isActiveSubscriber(s)).length;
   const allPersonsCount = getAllPersons().length;
 
-  // SMS length calculation
   const charLength = message.length;
   const smsSegments = Math.ceil(charLength / 160) || 1;
   const isOverTwilioLimit = charLength > 1600;
@@ -181,7 +159,7 @@ export const SmsCampaignPage: React.FC = () => {
     try {
       const payload: any = {
         name: campaignName,
-        campaignName,          // also send as campaignName for backend compat
+        campaignName,
         message,
         recipientType,
       };
@@ -192,12 +170,10 @@ export const SmsCampaignPage: React.FC = () => {
       } else {
         payload.targetFilter = targetFilter;
 
-        // ✅ Manual numbers — CRITICAL: send the actual phone numbers
         if (targetFilter === 'Manual Numbers') {
           payload.manualNumbers = manualNumbers;
         }
 
-        // ✅ Package-specific (translate "Package:<id>" to a proper payload)
         if (targetFilter.startsWith('Package:')) {
           const pkgId = targetFilter.slice('Package:'.length);
           const pkgTitle = packages.find((p) => p.id === pkgId)?.titleEn || 'Package';
@@ -206,9 +182,7 @@ export const SmsCampaignPage: React.FC = () => {
         }
       }
 
-      if (scheduledDate) {
-        payload.scheduledDate = scheduledDate;
-      }
+      if (scheduledDate) payload.scheduledDate = scheduledDate;
 
       console.log('📤 Sending SMS campaign payload:', payload);
 
@@ -234,17 +208,77 @@ export const SmsCampaignPage: React.FC = () => {
     }
   };
 
-  const handleExportCampaignReport = (cmp: SmsCampaign) => {
-    const headers = ['Recipient Phone', 'Name', 'Status'];
-    const rows = (cmp.recipients || []).map((r) => [r.phone, r.name || 'Subscriber', r.status]);
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const link = document.createElement('a');
-    link.href = encodeURI(csvContent);
-    link.download = `sms_report_${cmp.name.replace(/\s+/g, '_')}.csv`;
-    link.click();
-    showToast('success', 'Exported campaign recipient report CSV');
+  // ✅ Rewritten — fetches recipients from backend
+  const handleExportCampaignReport = async (cmp: any) => {
+    const campaignNameToExport = cmp.name || cmp.campaignName;
+    if (!campaignNameToExport) {
+      showToast('error', 'Campaign name missing');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token') || '';
+      const url = `${API_BASE}/admin/sms/campaigns/${encodeURIComponent(
+        campaignNameToExport
+      )}/recipients`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+
+      const json = await res.json();
+      const recipients: any[] = Array.isArray(json?.data)
+        ? json.data
+        : Array.isArray(json)
+          ? json
+          : [];
+
+      if (recipients.length === 0) {
+        showToast('info', 'No recipients to export for this campaign');
+        return;
+      }
+
+      const escapeCsv = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
+      const headers = ['Phone', 'Status', 'Error', 'Sent At'];
+      const rows = recipients.map((r) => [
+        `"\t${r.phone || ''}"`,
+        escapeCsv(r.status || ''),
+        escapeCsv(r.error_message || r.errorMessage || ''),
+        escapeCsv(r.sent_at || r.sentAt || ''),
+      ]);
+
+      const csvBody = [
+        headers.map(escapeCsv).join(','),
+        ...rows.map((r) => r.join(',')),
+      ].join('\r\n');
+
+      const csvContent = '\uFEFF' + csvBody;
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', blobUrl);
+      link.setAttribute(
+        'download',
+        `campaign_${campaignNameToExport.replace(/[^a-z0-9]/gi, '_')}_${new Date()
+          .toISOString()
+          .substring(0, 10)}.csv`
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+
+      showToast('success', `Exported ${recipients.length} recipients`);
+    } catch (error: any) {
+      console.error('❌ Export error:', error);
+      showToast('error', error?.message || 'Failed to export campaign report');
+    }
   };
 
   if (isLoading) {
@@ -283,7 +317,6 @@ export const SmsCampaignPage: React.FC = () => {
 
       {/* Campaign Composer Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Form (2 cols) */}
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-5">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-[#1A5B4B]" /> Campaign Composer
@@ -303,7 +336,6 @@ export const SmsCampaignPage: React.FC = () => {
             />
           </div>
 
-          {/* Recipient Type Selector */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Recipient Type *</label>
             <div className="flex gap-3">
@@ -350,12 +382,6 @@ export const SmsCampaignPage: React.FC = () => {
                   );
                 })}
               </select>
-              {selectedPackageId && (
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Sending to persons in:{' '}
-                  {packages.find((p) => p.id === selectedPackageId)?.titleEn}
-                </p>
-              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -373,7 +399,6 @@ export const SmsCampaignPage: React.FC = () => {
                   </option>
                   <option value="All Subscribers">All Subscribers ({subscribers.length})</option>
 
-                  {/* Package options use IDs in the value */}
                   <optgroup label="📦 Package Specific Subscribers">
                     {packages.map((pkg) => {
                       const count = getSubscribersForPackageId(pkg.id).length;
@@ -387,8 +412,7 @@ export const SmsCampaignPage: React.FC = () => {
 
                   <optgroup label="⚙️ Other Recipient Filters">
                     <option value="Package-specific">
-                      All Package Leads (
-                      {subscribers.filter((s) => s.packageInterestId).length})
+                      All Package Leads ({subscribers.filter((s) => s.packageInterestId).length})
                     </option>
                     <option value="Manual Numbers">Manual Numbers Input</option>
                   </optgroup>
@@ -426,16 +450,13 @@ export const SmsCampaignPage: React.FC = () => {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-slate-700">
-                SMS Message Content *
-              </label>
+              <label className="block text-xs font-bold text-slate-700">SMS Message Content *</label>
               <span
                 className={`text-[11px] font-mono font-bold ${
                   charLength > 1500 ? 'text-rose-600' : 'text-slate-500'
                 }`}
               >
-                {charLength} / 1600 chars ({smsSegments}{' '}
-                {smsSegments === 1 ? 'segment' : 'segments'})
+                {charLength} / 1600 chars ({smsSegments} {smsSegments === 1 ? 'segment' : 'segments'})
               </span>
             </div>
             <textarea
@@ -454,7 +475,6 @@ export const SmsCampaignPage: React.FC = () => {
             )}
           </div>
 
-          {/* Actions Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
             <div className="flex items-center gap-2 text-xs text-slate-600">
               <Users className="w-4 h-4 text-[#1A5B4B]" />
@@ -467,14 +487,6 @@ export const SmsCampaignPage: React.FC = () => {
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setIsTestModalOpen(true)}
-                className="px-4 py-2 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 font-semibold text-xs text-slate-800 transition-colors"
-              >
-                Send Test SMS
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setIsSendConfirmOpen(true)}
                 disabled={!message.trim() || isOverTwilioLimit}
                 className="px-5 py-2 rounded-xl bg-[#1A5B4B] hover:bg-[#14483B] text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
@@ -485,7 +497,6 @@ export const SmsCampaignPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Mobile Live Preview Card */}
         <div className="bg-[#1A1A2E] text-white p-6 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden">
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -501,7 +512,7 @@ export const SmsCampaignPage: React.FC = () => {
                   DT
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-200">Delta Travel</p>
+                  <p className="text-xs font-bold text-slate-200">Delta Group</p>
                   <p className="text-[9px] text-slate-400">SMS Broadcast</p>
                 </div>
               </div>
@@ -540,7 +551,6 @@ export const SmsCampaignPage: React.FC = () => {
             <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
               <tr>
                 <th className="p-3">Campaign Name</th>
-                <th className="p-3">Target Audience</th>
                 <th className="p-3">Message Preview</th>
                 <th className="p-3">Recipients</th>
                 <th className="p-3">Sent Date</th>
@@ -551,22 +561,35 @@ export const SmsCampaignPage: React.FC = () => {
             <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
               {campaigns.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500">
+                  <td colSpan={6} className="p-8 text-center text-slate-500">
                     No past campaigns sent yet.
                   </td>
                 </tr>
               ) : (
-                campaigns.map((cmp) => (
-                  <tr key={cmp.id} className="hover:bg-slate-50">
+                campaigns.map((cmp: any) => (
+                  <tr key={cmp.name} className="hover:bg-slate-50">
                     <td className="p-3 font-bold text-slate-900">{cmp.name}</td>
-                    <td className="p-3 text-slate-600">{cmp.targetFilter}</td>
                     <td className="p-3 max-w-xs truncate text-slate-700 font-sans">
                       {cmp.message}
                     </td>
-                    <td className="p-3 font-bold text-slate-900">{cmp.recipientsCount}</td>
-                    <td className="p-3 text-slate-500">{cmp.sentDate}</td>
+                    <td className="p-3 font-bold text-slate-900">
+                      {cmp.recipientsCount ?? cmp.recipients_count ?? 0}
+                    </td>
+                    <td className="p-3 text-slate-500">
+                      {cmp.sentDate || cmp.sent_date
+                        ? new Date(cmp.sentDate || cmp.sent_date).toLocaleString()
+                        : '—'}
+                    </td>
                     <td className="p-3">
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
+                          cmp.status === 'Delivered'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : cmp.status === 'Partial'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
                         {cmp.status}
                       </span>
                     </td>
@@ -585,13 +608,6 @@ export const SmsCampaignPage: React.FC = () => {
           </table>
         </div>
       </div>
-
-      {/* Modals */}
-      <TestSmsModal
-        isOpen={isTestModalOpen}
-        message={message}
-        onClose={() => setIsTestModalOpen(false)}
-      />
 
       <ConfirmModal
         isOpen={isSendConfirmOpen}
