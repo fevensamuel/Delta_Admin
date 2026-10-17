@@ -158,8 +158,8 @@ export interface SmsCampaign {
   message: string;
   recipientsCount: number;
   sentDate: string;
-  status: 'Delivered' | 'Failed' | 'Sending';
-  recipients?: { phone: string; name?: string; status: 'Delivered' | 'Failed' }[];
+  status: 'Delivered' | 'Sent' | 'Partial' | 'Failed' | 'Sending';
+  recipients?: { phone: string; name?: string; status: 'Delivered' | 'Sent' | 'Failed' }[];
 }
 
 export type InquiryStatus = 'New' | 'Contacted' | 'Resolved';

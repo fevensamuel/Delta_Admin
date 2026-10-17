@@ -2,21 +2,19 @@
 import { apiClient } from './client';
 import { SmsCampaign } from '../types';
 
+// Campaign sends go out one SMS at a time, so a big campaign can take minutes.
+const SEND_CAMPAIGN_TIMEOUT_MS = 10 * 60 * 1000;
+
 export async function getCampaignsApi(): Promise<SmsCampaign[]> {
   try {
     const res = await apiClient.get('/admin/sms/campaigns');
     console.log('📡 SMS campaigns response:', res.data);
 
-    if (res.data && typeof res.data === 'object') {
-      if (Array.isArray(res.data.data)) {
-        return res.data.data;
-      }
-      if (res.data.count !== undefined && Array.isArray(res.data.data)) {
-        return res.data.data;
-      }
-      if (Array.isArray(res.data)) {
-        return res.data;
-      }
+    if (Array.isArray(res.data?.data)) {
+      return res.data.data;
+    }
+    if (Array.isArray(res.data)) {
+      return res.data;
     }
 
     console.warn('⚠️ Could not extract campaigns from response, returning empty array');
@@ -45,11 +43,14 @@ export async function sendSmsCampaignApi(campaignData: any): Promise<SmsCampaign
 
     console.log('📤 Sending SMS campaign payload:', payload);
 
-    const res = await apiClient.post('/admin/sms/campaign', payload);
+    const res = await apiClient.post('/admin/sms/campaign', payload, {
+      timeout: SEND_CAMPAIGN_TIMEOUT_MS,
+    });
     const data = res.data?.data || res.data;
     return data;
   } catch (error) {
     console.error('❌ Error sending SMS campaign:', error);
-    throw new Error((error as Error)?.message || 'Failed to send SMS campaign');
+    // Rethrow the ORIGINAL error so error.response.data (the backend's message) survives.
+    throw error;
   }
 }

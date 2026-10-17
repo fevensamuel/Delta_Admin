@@ -191,7 +191,7 @@ export const SmsCampaignPage: React.FC = () => {
       showToast(
         'success',
         `Campaign "${newCmp.campaignName || newCmp.name || campaignName}" sent. ` +
-          `Delivered: ${newCmp.delivered ?? 0}, Failed: ${newCmp.failed ?? 0}`
+          `Accepted by AfroMessage: ${newCmp.sent ?? 0}, Failed: ${newCmp.failed ?? 0}`
       );
       setIsSendConfirmOpen(false);
       setMessage('');
@@ -201,6 +201,7 @@ export const SmsCampaignPage: React.FC = () => {
       const msg =
         error?.response?.data?.error ||
         error?.response?.data?.message ||
+         error?.message ||
         'Failed to send campaign';
       showToast('error', msg);
     } finally {
@@ -217,7 +218,7 @@ export const SmsCampaignPage: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem('token') || '';
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token') || '';
       const url = `${API_BASE}/admin/sms/campaigns/${encodeURIComponent(
         campaignNameToExport
       )}/recipients`;
@@ -576,7 +577,9 @@ export const SmsCampaignPage: React.FC = () => {
           <td className="p-3 max-w-xs truncate text-slate-700 font-sans">
             {cmp.message || '—'}
           </td>
-          <td className="p-3 font-bold text-slate-900">1</td>
+          <td className="p-3 font-bold text-slate-900">
+            {cmp.recipients_count ?? cmp.recipientsCount ?? 1}
+          </td>
           <td className="p-3 text-slate-500">
             {sentAt ? new Date(sentAt).toLocaleString() : '—'}
           </td>
@@ -585,9 +588,13 @@ export const SmsCampaignPage: React.FC = () => {
               className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
                 status === 'Delivered'
                   ? 'bg-emerald-100 text-emerald-800'
-                  : status === 'Failed'
-                    ? 'bg-rose-100 text-rose-800'
-                    : 'bg-slate-100 text-slate-700'
+                  : status === 'Sent'
+                    ? 'bg-sky-100 text-sky-800'
+                    : status === 'Failed'
+                      ? 'bg-rose-100 text-rose-800'
+                      : status === 'Partial'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-slate-100 text-slate-700'
               }`}
             >
               {status}
