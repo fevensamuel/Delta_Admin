@@ -33,14 +33,14 @@ export const SmsCampaignPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Campaign Composer State
-  const [campaignName, setCampaignName] = useState('Ramadan Umrah Special Promotion 2026');
+  const [campaignName, setCampaignName] = useState(' Special Promotion ');
   const [targetFilter, setTargetFilter] = useState('Active Opt-in');
   const [recipientType, setRecipientType] = useState<'subscribers' | 'persons'>('subscribers');
   const [selectedPackageId, setSelectedPackageId] = useState<string>('');
   const [manualNumbers, setManualNumbers] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
   const [message, setMessage] = useState(
-    'Delta Travel Notice: Early bird discount of $150 available on 14 Days Ramadan Umrah packages! Reply YES on WhatsApp to reserve your seat.'
+    'Delta Travel Notice: '
   );
 
   // Modals
@@ -182,17 +182,38 @@ export const SmsCampaignPage: React.FC = () => {
         }
       }
 
-      if (scheduledDate) payload.scheduledDate = scheduledDate;
+      if (scheduledDate) {
+        const when = new Date(scheduledDate);
+        if (Number.isNaN(when.getTime())) {
+          showToast('error', 'The scheduled date is not valid');
+          return;
+        }
+        if (when.getTime() < Date.now() - 60_000) {
+          showToast('error', 'The scheduled time is in the past');
+          return;
+        }
+        payload.scheduledDate = when.toISOString();
+      }
 
       console.log('📤 Sending SMS campaign payload:', payload);
 
       const newCmp: any = await sendSmsCampaignApi(payload);
 
-      showToast(
-        'success',
-        `Campaign "${newCmp.campaignName || newCmp.name || campaignName}" sent. ` +
-          `Accepted by AfroMessage: ${newCmp.sent ?? 0}, Failed: ${newCmp.failed ?? 0}`
-      );
+      if (newCmp.scheduled) {
+        showToast(
+          'success',
+          `Campaign "${newCmp.campaignName || campaignName}" scheduled for ` +
+            `${new Date(newCmp.scheduledFor).toLocaleString()} ` +
+            `(${newCmp.totalRecipients ?? 0} recipients)`
+        );
+        setScheduledDate('');
+      } else {
+        showToast(
+          'success',
+          `Campaign "${newCmp.campaignName || newCmp.name || campaignName}" sent. ` +
+            `Accepted by AfroMessage: ${newCmp.sent ?? 0}, Failed: ${newCmp.failed ?? 0}`
+        );
+      }
       setIsSendConfirmOpen(false);
       setMessage('');
       loadData();
@@ -201,7 +222,6 @@ export const SmsCampaignPage: React.FC = () => {
       const msg =
         error?.response?.data?.error ||
         error?.response?.data?.message ||
-         error?.message ||
         'Failed to send campaign';
       showToast('error', msg);
     } finally {
@@ -279,6 +299,29 @@ export const SmsCampaignPage: React.FC = () => {
     } catch (error: any) {
       console.error('❌ Export error:', error);
       showToast('error', error?.message || 'Failed to export campaign report');
+    }
+  };
+
+  const handleCancelSchedule = async (cmp: any) => {
+    const name = cmp.campaignName || cmp.name;
+    if (!name) return;
+    if (!window.confirm(`Cancel the scheduled campaign "${name}"? It will not be sent.`)) return;
+
+    try {
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token') || '';
+      const res = await fetch(
+        `${API_BASE}/admin/sms/campaigns/${encodeURIComponent(name)}/schedule`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || `Server returned ${res.status}`);
+      }
+      showToast('success', `Scheduled campaign "${name}" cancelled`);
+      loadData();
+    } catch (error: any) {
+      console.error('❌ Cancel schedule error:', error);
+      showToast('error', error?.message || 'Failed to cancel scheduled campaign');
     }
   };
 
@@ -594,19 +637,30 @@ export const SmsCampaignPage: React.FC = () => {
                       ? 'bg-rose-100 text-rose-800'
                       : status === 'Partial'
                         ? 'bg-amber-100 text-amber-800'
-                        : 'bg-slate-100 text-slate-700'
+                        : status === 'Scheduled'
+                          ? 'bg-indigo-100 text-indigo-800'
+                          : 'bg-slate-100 text-slate-700'
               }`}
             >
               {status}
             </span>
           </td>
           <td className="p-3 text-right">
-            <button
-              onClick={() => handleExportCampaignReport(cmp)}
-              className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold inline-flex items-center gap-1"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#1A5B4B]" /> Export CSV
-            </button>
+            {status === 'Scheduled' ? (
+              <button
+                onClick={() => handleCancelSchedule(cmp)}
+                className="px-2.5 py-1 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-semibold inline-flex items-center gap-1"
+              >
+                Cancel
+              </button>
+            ) : (
+              <button
+                onClick={() => handleExportCampaignReport(cmp)}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold inline-flex items-center gap-1"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-[#1A5B4B]" /> Export CSV
+              </button>
+            )}
           </td>
         </tr>
       );
