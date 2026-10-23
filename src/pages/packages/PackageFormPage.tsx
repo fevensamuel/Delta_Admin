@@ -38,7 +38,7 @@ export const PackageFormPage: React.FC = () => {
           priceUsd: found.priceUsd || found.price || 0,
           priceEtb: found.priceEtb || 0,
           priceSar: found.priceSar || 0,
-          status: found.status || (found.isActive ? 'Active' : 'Inactive'),
+          status: found.status || (found.isActive === false ? 'Archived' : 'Active'),
         };
         setPackageToEdit(processedData);
         console.log('✅ Package loaded for edit:', processedData.titleEn);

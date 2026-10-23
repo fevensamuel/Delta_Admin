@@ -105,7 +105,7 @@ export const PackageForm: React.FC<PackageFormProps> = ({
 
   const [itinerary, setItinerary] = useState<ItineraryDay[]>(parseArray(initialData?.itinerary));
 
-  const [status, setStatus] = useState<'Active' | 'Inactive'>(initialData?.status || 'Active');
+  const [status, setStatus] = useState<'Active' | 'Inactive' | 'Archived'>(initialData?.status || 'Active')
   const [priceReason, setPriceReason] = useState('');
 
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -849,9 +849,10 @@ export const PackageForm: React.FC<PackageFormProps> = ({
       <div className="bg-white p-6 rounded-lg border border-[#E2E8F0] shadow-xs flex items-center justify-between">
         <div>
           <label className="block text-xs font-bold text-[#111827] mb-1">Package Status</label>
-          <select value={status} onChange={(e) => setStatus(e.target.value as 'Active' | 'Inactive')} className="px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#111827]">
-            <option value="Active">Active (Published)</option>
-            <option value="Inactive">Inactive (Hidden)</option>
+          <select value={status} onChange={(e) => setStatus(e.target.value as 'Active' | 'Inactive' | 'Archived')} className="px-3.5 py-2 rounded-lg border border-[#E2E8F0] text-sm font-semibold text-[#111827]">
+            <option value="Active">Active (Published with price)</option>
+            <option value="Inactive">Inactive (Shown without price)</option>
+            <option value="Archived">Archived (Hidden from website)</option>
           </select>
         </div>
 

@@ -116,9 +116,9 @@ export const PackageList: React.FC = () => {
 
   const handleToggleStatus = async (pkg: Package) => {
     try {
-      const newStatus = pkg.isActive ? 'Inactive' : 'Active';
+      const newStatus = (pkg.status || (pkg.isActive === false ? 'Archived' : 'Active')) === 'Archived' ? 'Active' : 'Archived';
       await updatePackageApi(pkg.id, { 
-        isActive: !pkg.isActive,
+        isActive: newStatus === 'Active',
         status: newStatus
       });
       showToast('success', `Package "${pkg.titleEn}" status set to ${newStatus}`);
@@ -428,7 +428,7 @@ export const PackageList: React.FC = () => {
                     paginatedPackages.map((pkg) => {
                       const titleEn = pkg.titleEn || 'Untitled Package';
                       const category = pkg.category || 'Uncategorized';
-                      const isActive = pkg.isActive !== undefined ? pkg.isActive : true;
+                      const pkgStatus = pkg.status || (pkg.isActive === false ? 'Archived' : 'Active');
                       const priceUsdVal = pkg.priceUsd || 0;
                       const priceEtbVal = pkg.priceEtb || Math.round(priceUsdVal * rate);
                       const hasRange = pkg.priceType === 'range' || (pkg.priceUsdMax && pkg.priceUsdMax > priceUsdVal);
@@ -492,7 +492,7 @@ export const PackageList: React.FC = () => {
                           </td>
 
                           <td className="p-3.5">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white ${isActive ? 'bg-emerald-600' : 'bg-[#C8102E]'}`}>
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white ${pkgStatus === 'Active' ? 'bg-emerald-600' : pkgStatus === 'Inactive' ? 'bg-amber-500' : 'bg-slate-500'}, and {isActive ? 'Active' : 'Inactive'} → {pkgStatus}`}>
                               {isActive ? 'Active' : 'Inactive'}
                             </span>
                           </td>
@@ -500,7 +500,7 @@ export const PackageList: React.FC = () => {
                           <td className="p-3.5 pr-5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <button onClick={() => navigate(`/packages/${pkg.id}/edit`)} className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F9FAFB] text-[#111827] transition-colors cursor-pointer" title="Edit Package"><Edit className="w-4 h-4" /></button>
-                              <button onClick={() => handleToggleStatus(pkg)} className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F9FAFB] text-amber-600 transition-colors cursor-pointer" title={isActive ? 'Set Inactive' : 'Set Active'}><Archive className="w-4 h-4" /></button>
+                              <button onClick={() => handleToggleStatus(pkg)} className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F9FAFB] text-amber-600 transition-colors cursor-pointer" title={pkgStatus === 'Archived' ? 'Restore (set Active)' : 'Archive'}><Archive className="w-4 h-4" /></button>
                               <button onClick={() => setSelectedPackageForDelete(pkg)} className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-rose-50 text-[#C8102E] transition-colors cursor-pointer" title="Delete Package"><Trash2 className="w-4 h-4" /></button>
                             </div>
                           </td>
