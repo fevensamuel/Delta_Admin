@@ -492,8 +492,10 @@ export const PackageList: React.FC = () => {
                           </td>
 
                           <td className="p-3.5">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white ${pkgStatus === 'Active' ? 'bg-emerald-600' : pkgStatus === 'Inactive' ? 'bg-amber-500' : 'bg-slate-500'}, and {isActive ? 'Active' : 'Inactive'} → {pkgStatus}`}>
-                              {isActive ? 'Active' : 'Inactive'}
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white ${
+                              pkgStatus === 'Active' ? 'bg-emerald-600' : pkgStatus === 'Inactive' ? 'bg-amber-500' : 'bg-slate-500'
+                            }`}>
+                            {pkgStatus}
                             </span>
                           </td>
 
