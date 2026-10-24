@@ -125,8 +125,14 @@ export const PackageList: React.FC = () => {
         isActive: newStatus === 'Active',
         status: newStatus
       });
+      setPackages((currentPackages) =>
+        currentPackages.map((currentPackage) =>
+          currentPackage.id === pkg.id
+            ? { ...currentPackage, isActive: newStatus === 'Active', status: newStatus }
+            : currentPackage
+        )
+      );
       showToast('success', `Package "${pkg.titleEn}" status set to ${newStatus}`);
-      await loadPackages();
     } catch (error) {
       console.error('❌ Error updating status:', error);
       showToast('error', 'Failed to update package status');
