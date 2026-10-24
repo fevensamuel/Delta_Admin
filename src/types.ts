@@ -111,8 +111,8 @@ export interface Package {
   availableDates: string[];
   itinerary: ItineraryDay[];
   whatsappClicks: number;
-  status: 'Active' | 'Archived' | 'Inactive';
   isActive?: boolean;
+  status?: 'Active' | 'Inactive' | 'Archived'; 
   createdAt: string;
   updatedAt: string;
 }

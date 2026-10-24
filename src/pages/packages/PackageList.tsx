@@ -116,7 +116,7 @@ export const PackageList: React.FC = () => {
 
   const handleToggleStatus = async (pkg: Package) => {
     try {
-      const newStatus = (pkg.status || (pkg.isActive === false ? 'Archived' : 'Active')) === 'Archived' ? 'Active' : 'Archived';
+      const newStatus = (pkg.status || (pkg.isActive === false ? 'Inactive' : 'Active')) === 'Archived' ? 'Active' : 'Archived';
       await updatePackageApi(pkg.id, { 
         isActive: newStatus === 'Active',
         status: newStatus
@@ -428,7 +428,7 @@ export const PackageList: React.FC = () => {
                     paginatedPackages.map((pkg) => {
                       const titleEn = pkg.titleEn || 'Untitled Package';
                       const category = pkg.category || 'Uncategorized';
-                      const pkgStatus = pkg.status || (pkg.isActive === false ? 'Archived' : 'Active');
+                      const pkgStatus = pkg.status || (pkg.isActive === false ? 'Inactive' : 'Active');
                       const priceUsdVal = pkg.priceUsd || 0;
                       const priceEtbVal = pkg.priceEtb || Math.round(priceUsdVal * rate);
                       const hasRange = pkg.priceType === 'range' || (pkg.priceUsdMax && pkg.priceUsdMax > priceUsdVal);
