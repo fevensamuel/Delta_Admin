@@ -8,8 +8,9 @@ import { Pagination } from '../../components/common/Pagination';
 import { useToast } from '../../context/ToastContext';
 import { useDebounce } from '../../hooks/useDebounce';
 
+// CHANGED: removed the unused `Archive` icon import
 import { 
-  Plus, Search, Filter, Edit, Trash2, Archive, MessageSquare, 
+  Plus, Search, Filter, Edit, Trash2, MessageSquare, 
   Package as PackageIcon, RefreshCw, Users, UserPlus, User, X
 } from 'lucide-react';
 import { useExchangeRateStore } from '../../store/useExchangeRateStore';
@@ -114,9 +115,12 @@ export const PackageList: React.FC = () => {
     showToast('success', 'Packages refreshed');
   };
 
-  const handleToggleStatus = async (pkg: Package) => {
+  // CHANGED: replaces handleToggleStatus. Sets the exact status chosen
+  // (Active / Inactive / Archived) instead of only flipping Active <-> Archived.
+  const handleChangeStatus = async (pkg: Package, newStatus: 'Active' | 'Inactive' | 'Archived') => {
+    const currentStatus = pkg.status || (pkg.isActive === false ? 'Inactive' : 'Active');
+    if (newStatus === currentStatus) return;
     try {
-      const newStatus = (pkg.status || (pkg.isActive === false ? 'Inactive' : 'Active')) === 'Archived' ? 'Active' : 'Archived';
       await updatePackageApi(pkg.id, { 
         isActive: newStatus === 'Active',
         status: newStatus
@@ -502,7 +506,17 @@ export const PackageList: React.FC = () => {
                           <td className="p-3.5 pr-5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <button onClick={() => navigate(`/packages/${pkg.id}/edit`)} className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F9FAFB] text-[#111827] transition-colors cursor-pointer" title="Edit Package"><Edit className="w-4 h-4" /></button>
-                              <button onClick={() => handleToggleStatus(pkg)} className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-[#F9FAFB] text-amber-600 transition-colors cursor-pointer" title={pkgStatus === 'Archived' ? 'Restore (set Active)' : 'Archive'}><Archive className="w-4 h-4" /></button>
+                              {/* CHANGED: Archive button replaced by a 3-way status selector */}
+                              <select
+                                value={pkgStatus}
+                                onChange={(e) => handleChangeStatus(pkg, e.target.value as 'Active' | 'Inactive' | 'Archived')}
+                                className="h-8 px-2 rounded-lg border border-[#E2E8F0] bg-white text-[11px] font-semibold text-[#111827] cursor-pointer hover:bg-[#F9FAFB] transition-colors"
+                                title="Change package status"
+                              >
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                                <option value="Archived">Archived</option>
+                              </select>
                               <button onClick={() => setSelectedPackageForDelete(pkg)} className="p-1.5 rounded-lg border border-[#E2E8F0] hover:bg-rose-50 text-[#C8102E] transition-colors cursor-pointer" title="Delete Package"><Trash2 className="w-4 h-4" /></button>
                             </div>
                           </td>
