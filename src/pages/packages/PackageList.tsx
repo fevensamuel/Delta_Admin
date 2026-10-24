@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Package, CustomerCategory } from '../../types';
-import { getPackagesApi, deletePackageApi, updatePackageApi } from '../../api/packages';
+import { getPackagesApi, deletePackageApi, updatePackageApi, updatePackageStatusApi } from '../../api/packages';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { Pagination } from '../../components/common/Pagination';
@@ -121,14 +121,11 @@ export const PackageList: React.FC = () => {
     const currentStatus = pkg.status || (pkg.isActive === false ? 'Inactive' : 'Active');
     if (newStatus === currentStatus) return;
     try {
-      await updatePackageApi(pkg.id, { 
-        isActive: newStatus === 'Active',
-        status: newStatus
-      });
+      const updatedPackage = await updatePackageStatusApi(pkg.id, newStatus);
       setPackages((currentPackages) =>
         currentPackages.map((currentPackage) =>
           currentPackage.id === pkg.id
-            ? { ...currentPackage, isActive: newStatus === 'Active', status: newStatus }
+            ? { ...currentPackage, ...updatedPackage }
             : currentPackage
         )
       );

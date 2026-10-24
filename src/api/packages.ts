@@ -95,6 +95,23 @@ export async function updatePackageApi(id: string, data: FormData | Partial<Pack
   }
 }
 
+export async function updatePackageStatusApi(
+  id: string,
+  status: NonNullable<Package['status']>
+): Promise<Package> {
+  try {
+    const res = await apiClient.patch(`/admin/packages/${id}/status`, { status });
+    const updatedPkg = res.data?.data || res.data;
+    console.log('✅ Package status updated via API:', updatedPkg);
+    return updatedPkg;
+  } catch (error: any) {
+    console.error('❌ API Error - updating package status:', error);
+    console.error('❌ Response data:', error.response?.data);
+    console.error('❌ Response status:', error.response?.status);
+    throw error;
+  }
+}
+
 // Delete package
 export async function deletePackageApi(id: string): Promise<void> {
   try {
