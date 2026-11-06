@@ -27,13 +27,37 @@ export async function getCampaignsApi(): Promise<SmsCampaign[]> {
 
 export const getSmsHistory = getCampaignsApi;
 
-/**
- * ✅ Sends the SMS campaign payload to the backend.
- * IMPORTANT: This function passes the payload through UNCHANGED.
- * The component (SmsCampaignPage) already builds the correct payload with
- * manualNumbers, campaignName, packageInterestId, scheduledDate, etc.
- * Do NOT whitelist fields here — that silently drops data.
- */
+export interface FailedNumber {
+  phone: string;
+  campaignName: string;
+  message: string;
+  error: string;
+  failedAt: string;
+}
+
+/** Numbers whose latest attempt failed (optionally for one campaign), plus campaigns being resent now. */
+export async function getFailedNumbersApi(
+  campaignName?: string
+): Promise<{ items: FailedNumber[]; running: string[] }> {
+  const res = await apiClient.get('/admin/sms/failed', {
+    params: campaignName ? { campaign: campaignName } : undefined,
+  });
+  const data = res.data?.data || res.data;
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+    running: Array.isArray(data?.running) ? data.running : [],
+  };
+}
+
+/** Resends a campaign's message to its failed numbers (all of them, or only `phones`). */
+export async function resendFailedApi(
+  campaignName: string,
+  phones?: string[]
+): Promise<{ started: boolean; total: number }> {
+  const res = await apiClient.post('/admin/sms/resend-failed', { campaignName, phones });
+  return res.data?.data || res.data;
+}
+
 export async function sendSmsCampaignApi(campaignData: any): Promise<SmsCampaign> {
   try {
     const payload = {

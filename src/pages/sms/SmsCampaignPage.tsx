@@ -2,7 +2,13 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { SmsCampaign, Subscriber, Package } from '../../types';
-import { getCampaignsApi, sendSmsCampaignApi } from '../../api/sms';
+import {
+  getCampaignsApi,
+  sendSmsCampaignApi,
+  getFailedNumbersApi,
+  resendFailedApi,
+  type FailedNumber,
+} from '../../api/sms';
 import { getSubscribersApi } from '../../api/subscribers';
 import { getPackagesApi } from '../../api/packages';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
@@ -16,7 +22,8 @@ import {
   AlertTriangle,
   History,
   FileSpreadsheet,
-  User
+  User,
+  RotateCcw
 } from 'lucide-react';
 
 const API_BASE =
@@ -47,9 +54,28 @@ export const SmsCampaignPage: React.FC = () => {
   const [isSendConfirmOpen, setIsSendConfirmOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
+  // Failed numbers tab
+  const [activeTab, setActiveTab] = useState<'campaigns' | 'failed'>('campaigns');
+  const [failedItems, setFailedItems] = useState<FailedNumber[]>([]);
+  const [runningResends, setRunningResends] = useState<string[]>([]);
+  const [failedCampaign, setFailedCampaign] = useState('');
+  const [selectedPhones, setSelectedPhones] = useState<string[]>([]);
+  const [isResending, setIsResending] = useState(false);
+
   useEffect(() => {
     loadData();
+    loadFailed();
   }, []);
+
+  // While a resend is running in the background, refresh every few seconds.
+  useEffect(() => {
+    if (runningResends.length === 0) return;
+    const timer = setInterval(() => {
+      loadFailed();
+      getCampaignsApi().then((c) => setCampaigns(Array.isArray(c) ? c : []));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [runningResends]);
 
   useEffect(() => {
     const pkgId = searchParams.get('packageId');
@@ -82,6 +108,61 @@ export const SmsCampaignPage: React.FC = () => {
       setPackages([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadFailed = async () => {
+    try {
+      const data = await getFailedNumbersApi();
+      setFailedItems(data.items);
+      setRunningResends(data.running);
+    } catch (error) {
+      console.error('❌ Error loading failed numbers:', error);
+    }
+  };
+
+  const failedCampaignNames = Array.from(new Set(failedItems.map((f) => f.campaignName)));
+  const visibleFailed = failedCampaign
+    ? failedItems.filter((f) => f.campaignName === failedCampaign)
+    : failedItems;
+  const selectedVisible = selectedPhones.filter((p) => visibleFailed.some((f) => f.phone === p));
+  const resendRunningHere = failedCampaign !== '' && runningResends.includes(failedCampaign);
+
+  const openFailedFor = (name: string) => {
+    setFailedCampaign(name);
+    setSelectedPhones([]);
+    setActiveTab('failed');
+    loadFailed();
+  };
+
+  const toggleSelectedPhone = (phone: string) => {
+    setSelectedPhones((cur) => (cur.includes(phone) ? cur.filter((p) => p !== phone) : [...cur, phone]));
+  };
+
+  const handleResendFailed = async (onlySelected: boolean) => {
+    if (!failedCampaign) {
+      showToast('error', 'Choose a campaign first');
+      return;
+    }
+    const phones = onlySelected ? selectedVisible : undefined;
+    const count = onlySelected ? selectedVisible.length : visibleFailed.length;
+    if (count === 0) {
+      showToast('error', 'No numbers to resend');
+      return;
+    }
+    if (!window.confirm(`Resend "${failedCampaign}" to ${count} failed number(s)?`)) return;
+
+    setIsResending(true);
+    try {
+      const result = await resendFailedApi(failedCampaign, phones);
+      showToast('success', `Resending to ${result.total} number(s) in the background. This page refreshes itself.`);
+      setSelectedPhones([]);
+      await loadFailed();
+    } catch (error: any) {
+      console.error('❌ Resend failed error:', error);
+      showToast('error', error?.response?.data?.error || error?.response?.data?.message || 'Could not start the resend');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -581,7 +662,37 @@ export const SmsCampaignPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab('campaigns')}
+          className={`px-4 py-2 text-sm font-bold border-b-2 -mb-px ${
+            activeTab === 'campaigns'
+              ? 'border-[#C8102E] text-[#C8102E]'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          Sent Campaigns
+        </button>
+        <button
+          onClick={() => { setActiveTab('failed'); loadFailed(); }}
+          className={`px-4 py-2 text-sm font-bold border-b-2 -mb-px inline-flex items-center gap-2 ${
+            activeTab === 'failed'
+              ? 'border-[#C8102E] text-[#C8102E]'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          Failed Numbers
+          {failedItems.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px]">
+              {failedItems.length}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Campaign History Table */}
+      {activeTab === 'campaigns' && (
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden space-y-4 p-5">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -654,12 +765,22 @@ export const SmsCampaignPage: React.FC = () => {
                 Cancel
               </button>
             ) : (
-              <button
-                onClick={() => handleExportCampaignReport(cmp)}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold inline-flex items-center gap-1"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-[#1A5B4B]" /> Export CSV
-              </button>
+              <div className="inline-flex items-center gap-2">
+                {Number(cmp.failed_count ?? 0) > 0 && (
+                  <button
+                    onClick={() => openFailedFor(name)}
+                    className="px-2.5 py-1 rounded-lg border border-amber-200 text-amber-800 hover:bg-amber-50 text-xs font-semibold inline-flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Failed ({cmp.failed_count})
+                  </button>
+                )}
+                <button
+                  onClick={() => handleExportCampaignReport(cmp)}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold inline-flex items-center gap-1"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-[#1A5B4B]" /> Export CSV
+                </button>
+              </div>
             )}
           </td>
         </tr>
@@ -670,6 +791,111 @@ export const SmsCampaignPage: React.FC = () => {
           </table>
         </div>
       </div>
+      )}
+
+      {/* Failed Numbers */}
+      {activeTab === 'failed' && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden space-y-4 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600" /> Failed Numbers
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Numbers whose latest attempt failed. A number leaves this list once a resend succeeds.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={failedCampaign}
+                onChange={(e) => { setFailedCampaign(e.target.value); setSelectedPhones([]); }}
+                className="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white"
+              >
+                <option value="">All campaigns ({failedItems.length})</option>
+                {failedCampaignNames.map((n) => (
+                  <option key={n} value={n}>
+                    {n} ({failedItems.filter((f) => f.campaignName === n).length})
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => handleResendFailed(true)}
+                disabled={isResending || resendRunningHere || !failedCampaign || selectedVisible.length === 0}
+                className="px-3 py-2 rounded-lg border border-slate-300 text-slate-800 text-xs font-bold disabled:opacity-40 hover:bg-slate-50 inline-flex items-center gap-1"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Resend selected ({selectedVisible.length})
+              </button>
+              <button
+                onClick={() => handleResendFailed(false)}
+                disabled={isResending || resendRunningHere || !failedCampaign || visibleFailed.length === 0}
+                className="px-3 py-2 rounded-lg bg-[#C8102E] text-white text-xs font-bold disabled:opacity-40 hover:bg-[#a30d25] inline-flex items-center gap-1"
+              >
+                <Send className="w-3.5 h-3.5" /> Resend all failed ({visibleFailed.length})
+              </button>
+            </div>
+          </div>
+
+          {!failedCampaign && failedItems.length > 0 && (
+            <p className="text-xs text-slate-500">Choose a campaign to enable resending.</p>
+          )}
+          {resendRunningHere && (
+            <p className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+              Resending in the background... this list updates every few seconds.
+            </p>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                <tr>
+                  <th className="p-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={visibleFailed.length > 0 && selectedVisible.length === visibleFailed.length}
+                      onChange={(e) =>
+                        setSelectedPhones(e.target.checked ? visibleFailed.map((f) => f.phone) : [])
+                      }
+                    />
+                  </th>
+                  <th className="p-3">Phone</th>
+                  <th className="p-3">Campaign</th>
+                  <th className="p-3">Reason</th>
+                  <th className="p-3">Failed At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
+                {visibleFailed.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-slate-500">
+                      No failed numbers. Everything was delivered to the provider.
+                    </td>
+                  </tr>
+                ) : (
+                  visibleFailed.map((f) => (
+                    <tr key={`${f.campaignName}-${f.phone}`} className="hover:bg-slate-50">
+                      <td className="p-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedPhones.includes(f.phone)}
+                          onChange={() => toggleSelectedPhone(f.phone)}
+                        />
+                      </td>
+                      <td className="p-3 font-bold text-slate-900">{f.phone}</td>
+                      <td className="p-3">{f.campaignName}</td>
+                      <td className="p-3 max-w-md truncate text-slate-600" title={f.error}>
+                        {f.error || '—'}
+                      </td>
+                      <td className="p-3 text-slate-500">
+                        {f.failedAt ? new Date(f.failedAt).toLocaleString() : '—'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={isSendConfirmOpen}
